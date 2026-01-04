@@ -23,6 +23,7 @@ type Sale = {
   source: string
   payment_method: string
   is_paid: boolean
+  note: string | null
   total: number
   status: string
   created_at: string
@@ -149,6 +150,11 @@ export default function SalesPage() {
                               {expandedRows.has(sale.id) ? '▼' : '▶'}
                             </span>
                             {sale.sale_no}
+                            {sale.note && sale.note.trim() !== '' && (
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded" title={sale.note}>
+                                備註
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900">{sale.customer_code || '散客'}</td>
@@ -234,6 +240,14 @@ export default function SalesPage() {
                                   ))}
                                 </tbody>
                               </table>
+                              {sale.note && sale.note.trim() !== '' && (
+                                <div className="mt-4 border-t border-gray-200 pt-3">
+                                  <div className="text-xs font-semibold text-gray-900 mb-1">備註</div>
+                                  <div className="text-sm text-gray-900 bg-gray-50 rounded px-3 py-2">
+                                    {sale.note}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>

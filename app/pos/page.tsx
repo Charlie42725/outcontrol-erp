@@ -14,6 +14,7 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'cod'>('cash')
   const [isPaid, setIsPaid] = useState(true)
   const [customerCode, setCustomerCode] = useState('')
+  const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [searchResults, setSearchResults] = useState<Product[]>([])
@@ -126,6 +127,7 @@ export default function POSPage() {
           source: 'pos',
           payment_method: paymentMethod,
           is_paid: isPaid,
+          note: note || undefined,
           items: cart.map((item) => ({
             product_id: item.product_id,
             quantity: item.quantity,
@@ -142,6 +144,7 @@ export default function POSPage() {
         setCustomerCode('')
         setPaymentMethod('cash')
         setIsPaid(true)
+        setNote('')
         alert(`銷售完成！單號：${data.data.sale_no}`)
         barcodeInputRef.current?.focus()
       } else {
@@ -316,7 +319,7 @@ export default function POSPage() {
                 </select>
               </div>
 
-              <div className="mb-6">
+              <div className="mb-4">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -326,6 +329,17 @@ export default function POSPage() {
                   />
                   <span className="text-sm font-medium text-gray-900">已收款</span>
                 </label>
+              </div>
+
+              <div className="mb-6">
+                <label className="mb-2 block text-sm font-medium text-gray-900">備註（選填）</label>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="輸入備註..."
+                  rows={2}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-900 resize-none"
+                />
               </div>
 
               <div className="mb-6 border-t border-gray-200 pt-4">
