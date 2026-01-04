@@ -211,7 +211,7 @@ export default function PurchasesPage() {
                                       <td className="py-2 text-sm text-gray-900">{item.products.item_code}</td>
                                       <td className="py-2 text-sm text-gray-900">{item.products.name}</td>
                                       <td className="py-2 text-right text-sm text-gray-900">
-                                        {item.quantity} {item.products.unit}
+                                        {item.quantity}
                                       </td>
                                       <td className="py-2 text-right text-sm text-gray-900">
                                         {formatCurrency(item.cost)}

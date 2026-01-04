@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { vendorSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
+import { generateCode } from '@/lib/utils'
 
 // GET /api/vendors - List vendors
 export async function GET(request: NextRequest) {
@@ -58,6 +59,15 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data
+
+    // Generate vendor_code if not provided
+    if (!data.vendor_code) {
+      const { count } = await supabaseServer
+        .from('vendors')
+        .select('*', { count: 'exact', head: true })
+
+      data.vendor_code = generateCode('V', count || 0)
+    }
 
     // Check if vendor_code already exists
     const { data: existing } = await supabaseServer

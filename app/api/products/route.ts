@@ -10,10 +10,12 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const keyword = searchParams.get('keyword') || ''
     const active = searchParams.get('active')
+    const page = parseInt(searchParams.get('page') || '1')
+    const pageSize = 50
 
     let query = supabaseServer
       .from('products')
-      .select('*')
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
 
     // Filter by active status
@@ -26,7 +28,12 @@ export async function GET(request: NextRequest) {
       query = query.or(`name.ilike.%${keyword}%,item_code.ilike.%${keyword}%,barcode.ilike.%${keyword}%`)
     }
 
-    const { data, error } = await query
+    // Apply pagination
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+    query = query.range(from, to)
+
+    const { data, error, count } = await query
 
     if (error) {
       return NextResponse.json(
@@ -35,7 +42,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ ok: true, data })
+    return NextResponse.json({
+      ok: true,
+      data,
+      pagination: {
+        page,
+        pageSize,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / pageSize)
+      }
+    })
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: 'Internal server error' },
@@ -60,6 +76,15 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data
+
+    // Generate item_code if not provided
+    if (!data.item_code) {
+      const { count } = await supabaseServer
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+
+      data.item_code = generateCode('I', count || 0)
+    }
 
     // Check if item_code already exists
     const { data: existing } = await supabaseServer
@@ -92,12 +117,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert product
+    // If initial stock is provided, set avg_cost to cost value
     const { data: product, error } = await (supabaseServer
       .from('products') as any)
       .insert({
         ...data,
-        stock: 0,
-        avg_cost: 0,
+        avg_cost: data.stock > 0 ? data.cost : 0,
       })
       .select()
       .single()

@@ -16,7 +16,6 @@ export default function NewCustomerPage() {
     const formData = new FormData(e.currentTarget)
 
     const data = {
-      customer_code: formData.get('customer_code'),
       customer_name: formData.get('customer_name'),
       phone: formData.get('phone') || null,
       line_id: formData.get('line_id') || null,
@@ -56,19 +55,6 @@ export default function NewCustomerPage() {
           {error && (
             <div className="mb-4 rounded bg-red-50 p-3 text-red-700">{error}</div>
           )}
-
-          <div className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-gray-900">
-              客戶編號 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="customer_code"
-              required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-900"
-              placeholder="例：C0001"
-            />
-          </div>
 
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-gray-900">

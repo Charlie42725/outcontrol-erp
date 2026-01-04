@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 
 const navItems = [
   { href: '/', label: '首頁' },
-  { href: '/dashboard', label: '儀表板' },
+  { href: '/dashboard', label: '營收報表' },
   { href: '/pos', label: 'POS 收銀' },
   { href: '/products', label: '商品庫' },
   { href: '/vendors', label: '廠商管理' },

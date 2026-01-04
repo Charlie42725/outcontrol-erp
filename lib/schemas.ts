@@ -2,13 +2,14 @@ import { z } from 'zod'
 
 // Product schemas
 export const productSchema = z.object({
-  item_code: z.string().min(1, 'Item code is required'),
+  item_code: z.string().optional(),
   name: z.string().min(1, 'Name is required'),
   barcode: z.string().optional().nullable(),
   price: z.number().min(0, 'Price must be positive').default(0),
   cost: z.number().min(0, 'Cost must be positive').default(0),
   unit: z.string().default('件'),
   tags: z.array(z.string()).default([]),
+  stock: z.number().min(0, 'Stock cannot be negative').default(0),
   allow_negative: z.boolean().default(false),
   is_active: z.boolean().default(true),
 })
@@ -17,7 +18,7 @@ export const productUpdateSchema = productSchema.partial()
 
 // Customer schemas
 export const customerSchema = z.object({
-  customer_code: z.string().min(1, 'Customer code is required'),
+  customer_code: z.string().optional(),
   customer_name: z.string().min(1, 'Customer name is required'),
   phone: z.string().optional().nullable(),
   line_id: z.string().optional().nullable(),
@@ -30,7 +31,7 @@ export const customerSchema = z.object({
 
 // Vendor schemas
 export const vendorSchema = z.object({
-  vendor_code: z.string().min(1, 'Vendor code is required'),
+  vendor_code: z.string().optional(),
   vendor_name: z.string().min(1, 'Vendor name is required'),
   contact_person: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),

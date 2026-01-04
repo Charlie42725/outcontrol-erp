@@ -10,18 +10,27 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true)
   const [keyword, setKeyword] = useState('')
   const [activeFilter, setActiveFilter] = useState<boolean | null>(null)
+  const [page, setPage] = useState(1)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 50,
+    total: 0,
+    totalPages: 0
+  })
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (currentPage: number = page) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (keyword) params.set('keyword', keyword)
       if (activeFilter !== null) params.set('active', String(activeFilter))
+      params.set('page', String(currentPage))
 
       const res = await fetch(`/api/products?${params}`)
       const data = await res.json()
       if (data.ok) {
         setProducts(data.data || [])
+        setPagination(data.pagination)
       }
     } catch (err) {
       console.error('Failed to fetch products:', err)
@@ -31,12 +40,19 @@ export default function ProductsPage() {
   }
 
   useEffect(() => {
-    fetchProducts()
+    setPage(1)
+    fetchProducts(1)
   }, [activeFilter])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    fetchProducts()
+    setPage(1)
+    fetchProducts(1)
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage)
+    fetchProducts(newPage)
   }
 
   const toggleActive = async (id: string, isActive: boolean) => {
@@ -158,7 +174,6 @@ export default function ProductsPage() {
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">品號</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">條碼</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">商品名稱</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">單位</th>
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">售價</th>
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">成本</th>
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">庫存</th>
@@ -172,7 +187,6 @@ export default function ProductsPage() {
                       <td className="px-6 py-4 text-sm text-gray-900">{product.item_code}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">{product.barcode || '-'}</td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">{product.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{product.unit}</td>
                       <td className="px-6 py-4 text-right text-sm text-gray-900">
                         {formatCurrency(product.price)}
                       </td>
@@ -231,6 +245,64 @@ export default function ProductsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {!loading && products.length > 0 && pagination.totalPages > 1 && (
+            <div className="border-t border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  顯示第 {((pagination.page - 1) * pagination.pageSize) + 1} - {Math.min(pagination.page * pagination.pageSize, pagination.total)} 筆，共 {pagination.total} 筆
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page === 1}
+                    className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    上一頁
+                  </button>
+
+                  {/* Page numbers */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                      .filter(p => {
+                        // Show first page, last page, current page, and pages around current
+                        return p === 1 ||
+                               p === pagination.totalPages ||
+                               (p >= page - 2 && p <= page + 2)
+                      })
+                      .map((p, idx, arr) => {
+                        // Add ellipsis if there's a gap
+                        const showEllipsisBefore = idx > 0 && arr[idx - 1] !== p - 1
+                        return (
+                          <div key={p} className="flex items-center gap-1">
+                            {showEllipsisBefore && <span className="px-2 text-gray-500">...</span>}
+                            <button
+                              onClick={() => handlePageChange(p)}
+                              className={`min-w-[2rem] rounded px-3 py-1 text-sm ${
+                                p === page
+                                  ? 'bg-blue-600 text-white'
+                                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          </div>
+                        )
+                      })}
+                  </div>
+
+                  <button
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page === pagination.totalPages}
+                    className="rounded border border-gray-300 px-3 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    下一頁
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

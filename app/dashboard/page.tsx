@@ -131,7 +131,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-7xl">
-        <h1 className="mb-6 text-3xl font-bold text-gray-900">儀表板</h1>
+        <h1 className="mb-6 text-3xl font-bold text-gray-900">營收報表</h1>
 
         {/* KPI Cards */}
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

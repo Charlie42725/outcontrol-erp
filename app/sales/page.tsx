@@ -228,7 +228,7 @@ export default function SalesPage() {
                                       <td className="py-2 text-sm text-gray-900">{item.products.item_code}</td>
                                       <td className="py-2 text-sm text-gray-900">{item.snapshot_name}</td>
                                       <td className="py-2 text-right text-sm text-gray-900">
-                                        {item.quantity} {item.products.unit}
+                                        {item.quantity}
                                       </td>
                                       <td className="py-2 text-right text-sm text-gray-900">
                                         {formatCurrency(item.price)}

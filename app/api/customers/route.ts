@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { customerSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
+import { generateCode } from '@/lib/utils'
 
 // GET /api/customers - List customers
 export async function GET(request: NextRequest) {
@@ -58,6 +59,15 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data
+
+    // Generate customer_code if not provided
+    if (!data.customer_code) {
+      const { count } = await supabaseServer
+        .from('customers')
+        .select('*', { count: 'exact', head: true })
+
+      data.customer_code = generateCode('C', count || 0)
+    }
 
     // Check if customer_code already exists
     const { data: existing } = await supabaseServer

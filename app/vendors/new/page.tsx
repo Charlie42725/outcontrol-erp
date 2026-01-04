@@ -16,7 +16,6 @@ export default function NewVendorPage() {
     const formData = new FormData(e.currentTarget)
 
     const data = {
-      vendor_code: formData.get('vendor_code'),
       vendor_name: formData.get('vendor_name'),
       contact_person: formData.get('contact_person') || null,
       phone: formData.get('phone') || null,
@@ -57,19 +56,6 @@ export default function NewVendorPage() {
           {error && (
             <div className="mb-4 rounded bg-red-50 p-3 text-red-700">{error}</div>
           )}
-
-          <div className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-gray-900">
-              廠商編號 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="vendor_code"
-              required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-900"
-              placeholder="例：V0001"
-            />
-          </div>
 
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-gray-900">

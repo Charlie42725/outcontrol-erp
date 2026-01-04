@@ -16,12 +16,11 @@ export default function NewProductPage() {
     const formData = new FormData(e.currentTarget)
 
     const data = {
-      item_code: formData.get('item_code'),
       name: formData.get('name'),
       barcode: formData.get('barcode') || null,
       price: parseFloat(formData.get('price') as string) || 0,
       cost: parseFloat(formData.get('cost') as string) || 0,
-      unit: formData.get('unit') || '件',
+      stock: parseFloat(formData.get('stock') as string) || 0,
       allow_negative: formData.get('allow_negative') === 'on',
     }
 
@@ -55,19 +54,6 @@ export default function NewProductPage() {
           {error && (
             <div className="mb-4 rounded bg-red-50 p-3 text-red-700">{error}</div>
           )}
-
-          <div className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-gray-900">
-              品號 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="item_code"
-              required
-              className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-900"
-              placeholder="例：P0001"
-            />
-          </div>
 
           <div className="mb-4">
             <label className="mb-1 block text-sm font-medium text-gray-900">
@@ -126,11 +112,13 @@ export default function NewProductPage() {
           </div>
 
           <div className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-gray-900">單位</label>
+            <label className="mb-1 block text-sm font-medium text-gray-900">初始庫存</label>
             <input
-              type="text"
-              name="unit"
-              defaultValue="件"
+              type="number"
+              name="stock"
+              min="0"
+              step="1"
+              defaultValue="0"
               className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900"
             />
           </div>
