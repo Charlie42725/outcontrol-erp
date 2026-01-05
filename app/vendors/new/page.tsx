@@ -50,7 +50,7 @@ export default function NewVendorPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-2xl">
-        <h1 className="mb-6 text-3xl font-bold">新增廠商</h1>
+        <h1 className="mb-6 text-3xl font-bold text-gray-900">新增廠商</h1>
 
         <form onSubmit={handleSubmit} className="rounded-lg bg-white p-6 shadow">
           {error && (
