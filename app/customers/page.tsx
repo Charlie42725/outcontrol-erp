@@ -328,7 +328,7 @@ export default function CustomersPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-900">地址</label>
+                <label className="mb-1 block text-sm font-medium text-gray-900">門市地址</label>
                 <input
                   type="text"
                   value={formData.address || ''}

@@ -42,24 +42,57 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch customer details separately
+    // Fetch customer details
     const customerCodes = [...new Set((accounts as any[])?.map(a => a.partner_code) || [])]
     const { data: customers } = await supabaseServer
       .from('customers')
       .select('customer_code, customer_name')
       .in('customer_code', customerCodes)
 
-    // Map customer names to accounts
+    // Fetch sales details for accounts with ref_type='sale'
+    const saleIds = (accounts as any[])
+      ?.filter(a => a.ref_type === 'sale')
+      ?.map(a => a.ref_id)
+      .filter(Boolean) || []
+
+    let salesMap = new Map()
+    if (saleIds.length > 0) {
+      const { data: sales } = await (supabaseServer
+        .from('sales') as any)
+        .select(`
+          id,
+          sale_no,
+          sale_date,
+          sale_items (
+            id,
+            product_id,
+            quantity,
+            price,
+            subtotal,
+            snapshot_name,
+            products (
+              item_code,
+              unit
+            )
+          )
+        `)
+        .in('id', saleIds)
+
+      salesMap = new Map((sales as any[])?.map(s => [s.id, s]) || [])
+    }
+
+    // Map customer names and sales to accounts
     const customersMap = new Map(
       (customers as any[])?.map(c => [c.customer_code, c]) || []
     )
 
-    const accountsWithCustomers = (accounts as any[])?.map(account => ({
+    const accountsWithDetails = (accounts as any[])?.map(account => ({
       ...account,
-      customers: customersMap.get(account.partner_code) || null
+      customers: customersMap.get(account.partner_code) || null,
+      sales: account.ref_type === 'sale' ? salesMap.get(account.ref_id) : null
     }))
 
-    return NextResponse.json({ ok: true, data: accountsWithCustomers })
+    return NextResponse.json({ ok: true, data: accountsWithDetails })
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: 'Internal server error' },

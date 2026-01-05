@@ -39,6 +39,7 @@ export default function PurchasesPage() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [keyword, setKeyword] = useState('')
   const [productKeyword, setProductKeyword] = useState('')
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -76,6 +77,58 @@ export default function PurchasesPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     fetchPurchases()
+  }
+
+  const handleDeletePurchase = async (id: string, purchaseNo: string) => {
+    if (!confirm(`確定要刪除進貨單 ${purchaseNo} 嗎？\n\n此操作將會回補庫存，且無法復原。`)) {
+      return
+    }
+
+    setDeleting(id)
+    try {
+      const res = await fetch(`/api/purchases/${id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (data.ok) {
+        alert('刪除成功，庫存已回補')
+        fetchPurchases()
+      } else {
+        alert(`刪除失敗：${data.error}`)
+      }
+    } catch (err) {
+      alert('刪除失敗')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const handleDeleteItem = async (itemId: string, productName: string, purchaseId: string) => {
+    if (!confirm(`確定要刪除進貨明細「${productName}」嗎？\n\n此操作將會回補該商品庫存並重新計算進貨總額。`)) {
+      return
+    }
+
+    setDeleting(itemId)
+    try {
+      const res = await fetch(`/api/purchase-items/${itemId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (data.ok) {
+        alert('刪除成功，庫存已回補')
+        fetchPurchases()
+      } else {
+        alert(`刪除失敗：${data.error}`)
+      }
+    } catch (err) {
+      alert('刪除失敗')
+    } finally {
+      setDeleting(null)
+    }
   }
 
   return (
@@ -139,6 +192,7 @@ export default function PurchasesPage() {
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">平均成本</th>
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">總金額</th>
                     <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">狀態</th>
+                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -189,10 +243,19 @@ export default function PurchasesPage() {
                               : '草稿'}
                           </span>
                         </td>
+                        <td className="px-6 py-4 text-center text-sm" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleDeletePurchase(purchase.id, purchase.purchase_no)}
+                            disabled={deleting === purchase.id}
+                            className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {deleting === purchase.id ? '刪除中...' : '刪除'}
+                          </button>
+                        </td>
                       </tr>
                       {expandedRows.has(purchase.id) && purchase.purchase_items && (
                         <tr key={`${purchase.id}-details`}>
-                          <td colSpan={8} className="bg-gray-50 px-6 py-4">
+                          <td colSpan={9} className="bg-gray-50 px-6 py-4">
                             <div className="rounded-lg border border-gray-200 bg-white p-4">
                               <h4 className="mb-3 font-semibold text-gray-900">進貨明細</h4>
                               <table className="w-full">
@@ -203,6 +266,7 @@ export default function PurchasesPage() {
                                     <th className="pb-2 text-right text-xs font-semibold text-gray-900">數量</th>
                                     <th className="pb-2 text-right text-xs font-semibold text-gray-900">成本</th>
                                     <th className="pb-2 text-right text-xs font-semibold text-gray-900">小計</th>
+                                    <th className="pb-2 text-center text-xs font-semibold text-gray-900">操作</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -218,6 +282,15 @@ export default function PurchasesPage() {
                                       </td>
                                       <td className="py-2 text-right text-sm font-semibold text-gray-900">
                                         {formatCurrency(item.quantity * item.cost)}
+                                      </td>
+                                      <td className="py-2 text-center text-sm">
+                                        <button
+                                          onClick={() => handleDeleteItem(item.id, item.products.name, purchase.id)}
+                                          disabled={deleting === item.id}
+                                          className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                        >
+                                          {deleting === item.id ? '刪除中' : '刪除'}
+                                        </button>
                                       </td>
                                     </tr>
                                   ))}

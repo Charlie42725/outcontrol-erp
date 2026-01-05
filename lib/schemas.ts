@@ -14,7 +14,10 @@ export const productSchema = z.object({
   is_active: z.boolean().default(true),
 })
 
-export const productUpdateSchema = productSchema.partial()
+// Update schema excludes stock (managed via inventory operations only)
+export const productUpdateSchema = productSchema
+  .omit({ stock: true })
+  .partial()
 
 // Customer schemas
 export const customerSchema = z.object({

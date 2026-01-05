@@ -165,9 +165,10 @@ export async function POST(request: NextRequest) {
       cost: item.cost,
     }))
 
-    const { error: itemsError } = await (supabaseServer
+    const { data: insertedItems, error: itemsError } = await (supabaseServer
       .from('purchase_items') as any)
       .insert(purchaseItems)
+      .select()
 
     if (itemsError) {
       // Rollback: delete the purchase
@@ -197,6 +198,33 @@ export async function POST(request: NextRequest) {
         { ok: false, error: confirmError.message },
         { status: 500 }
       )
+    }
+
+    // 5. Create accounts payable for each item (if not paid)
+    if (!draft.is_paid && insertedItems) {
+      const apRecords = insertedItems.map((item: any) => ({
+        partner_type: 'vendor',
+        partner_code: draft.vendor_code,
+        direction: 'AP',
+        ref_type: 'purchase',
+        ref_id: purchase.id,
+        ref_no: purchaseNo,
+        purchase_item_id: item.id,
+        amount: item.subtotal,
+        received_paid: 0,
+        balance: item.subtotal,
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+        status: 'unpaid',
+      }))
+
+      const { error: apError } = await (supabaseServer
+        .from('partner_accounts') as any)
+        .insert(apRecords)
+
+      if (apError) {
+        console.error('Failed to create AP records:', apError)
+        // Don't fail the whole transaction, just log the error
+      }
     }
 
     return NextResponse.json(

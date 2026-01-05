@@ -296,6 +296,59 @@ export interface Database {
           subtotal?: number
         }
       }
+      partner_accounts: {
+        Row: {
+          id: string
+          partner_type: string
+          partner_code: string
+          direction: string
+          ref_type: string
+          ref_id: string
+          ref_no: string
+          purchase_item_id: string | null
+          amount: number
+          received_paid: number
+          balance: number
+          due_date: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          partner_type: string
+          partner_code: string
+          direction: string
+          ref_type: string
+          ref_id: string
+          ref_no: string
+          purchase_item_id?: string | null
+          amount: number
+          received_paid?: number
+          balance?: number
+          due_date?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          partner_type?: string
+          partner_code?: string
+          direction?: string
+          ref_type?: string
+          ref_id?: string
+          ref_no?: string
+          purchase_item_id?: string | null
+          amount?: number
+          received_paid?: number
+          balance?: number
+          due_date?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       users: {
         Row: {
           id: string

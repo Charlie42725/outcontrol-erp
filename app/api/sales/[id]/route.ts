@@ -131,10 +131,24 @@ export async function DELETE(
       }
     }
 
-    // 3. Delete sale items
+    // 3. Delete related partner accounts (AR)
+    const { error: arDeleteError } = await (supabaseServer
+      .from('partner_accounts') as any)
+      .delete()
+      .eq('ref_type', 'sale')
+      .eq('ref_id', id)
+
+    if (arDeleteError) {
+      return NextResponse.json(
+        { ok: false, error: `Failed to delete AR: ${arDeleteError.message}` },
+        { status: 500 }
+      )
+    }
+
+    // 4. Delete sale items
     await (supabaseServer.from('sale_items') as any).delete().eq('sale_id', id)
 
-    // 4. Delete sale
+    // 5. Delete sale
     const { error: deleteError } = await (supabaseServer
       .from('sales') as any)
       .delete()

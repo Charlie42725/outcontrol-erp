@@ -56,13 +56,13 @@ export async function PATCH(
       )
     }
 
-    const data = validation.data
+    const updateData = validation.data
 
-    // Update product
+    // Update product (stock and avg_cost excluded by schema)
     const { data: product, error } = await (supabaseServer
       .from('products') as any)
       .update({
-        ...data,
+        ...updateData,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)

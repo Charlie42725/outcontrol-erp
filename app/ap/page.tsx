@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 type APAccount = {
@@ -8,27 +8,48 @@ type APAccount = {
   partner_code: string
   ref_type: string
   ref_id: string
+  ref_no: string
+  purchase_item_id: string | null
   amount: number
   received_paid: number
   balance: number
   due_date: string
   status: string
   created_at: string
-  vendors?: {
-    vendor_name: string
+  purchase_item?: {
+    id: string
+    quantity: number
+    cost: number
+    subtotal: number
+    product_id: string
+    products: {
+      name: string
+      item_code: string
+      unit: string
+    }
   }
 }
 
-export default function APPage() {
-  const [accounts, setAccounts] = useState<APAccount[]>([])
+type VendorGroup = {
+  partner_code: string
+  vendor_name: string
+  accounts: APAccount[]
+  total_balance: number
+  unpaid_count: number
+}
+
+export default function APPageV2() {
+  const [vendorGroups, setVendorGroups] = useState<VendorGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
+  const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set())
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set())
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer_cathay' | 'transfer_fubon' | 'transfer_esun' | 'transfer_union' | 'transfer_linepay' | 'cod'>('transfer_cathay')
+  const [paymentMethod, setPaymentMethod] = useState('transfer_cathay')
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState('')
   const [keyword, setKeyword] = useState('')
+  const [currentVendor, setCurrentVendor] = useState<string | null>(null)
 
   const fetchAccounts = async () => {
     setLoading(true)
@@ -38,8 +59,36 @@ export default function APPage() {
 
       const res = await fetch(`/api/ap?${params}`)
       const data = await res.json()
+
       if (data.ok) {
-        setAccounts(data.data || [])
+        // 按廠商分組
+        const groups: { [key: string]: VendorGroup } = {}
+
+        data.data.forEach((account: any) => {
+          const key = account.partner_code
+
+          if (!groups[key]) {
+            groups[key] = {
+              partner_code: account.partner_code,
+              vendor_name: account.vendors?.vendor_name || account.partner_code,
+              accounts: [],
+              total_balance: 0,
+              unpaid_count: 0
+            }
+          }
+
+          groups[key].accounts.push({
+            ...account,
+            ref_no: account.purchases?.purchase_no || account.ref_id
+          })
+
+          if (account.status !== 'paid') {
+            groups[key].total_balance += account.balance
+            groups[key].unpaid_count += 1
+          }
+        })
+
+        setVendorGroups(Object.values(groups))
       }
     } catch (err) {
       console.error('Failed to fetch AP:', err)
@@ -57,23 +106,72 @@ export default function APPage() {
     fetchAccounts()
   }
 
-  const toggleAccount = (id: string) => {
-    setSelectedAccounts((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
+  const toggleVendor = (partnerCode: string) => {
+    const newExpanded = new Set(expandedVendors)
+    if (newExpanded.has(partnerCode)) {
+      newExpanded.delete(partnerCode)
+    } else {
+      newExpanded.add(partnerCode)
+    }
+    setExpandedVendors(newExpanded)
   }
 
-  const selectedTotal = accounts
-    .filter((a) => selectedAccounts.includes(a.id))
-    .reduce((sum, a) => sum + a.balance, 0)
+  const toggleAccount = (accountId: string) => {
+    const newSelected = new Set(selectedAccounts)
+    if (newSelected.has(accountId)) {
+      newSelected.delete(accountId)
+    } else {
+      newSelected.add(accountId)
+    }
+    setSelectedAccounts(newSelected)
+  }
+
+  const selectAllForVendor = (partnerCode: string, checked: boolean) => {
+    const group = vendorGroups.find(g => g.partner_code === partnerCode)
+    if (!group) return
+
+    const newSelected = new Set(selectedAccounts)
+
+    group.accounts
+      .filter(a => a.status !== 'paid')
+      .forEach(account => {
+        if (checked) {
+          newSelected.add(account.id)
+        } else {
+          newSelected.delete(account.id)
+        }
+      })
+
+    setSelectedAccounts(newSelected)
+  }
+
+  const openPaymentModal = (partnerCode: string) => {
+    setCurrentVendor(partnerCode)
+    setShowPaymentModal(true)
+    setError('')
+  }
+
+  const getSelectedTotal = () => {
+    let total = 0
+    vendorGroups.forEach(group => {
+      group.accounts.forEach(account => {
+        if (selectedAccounts.has(account.id)) {
+          total += account.balance
+        }
+      })
+    })
+    return total
+  }
 
   const handlePayment = async () => {
-    if (selectedAccounts.length === 0) {
+    if (selectedAccounts.size === 0) {
       setError('請選擇至少一筆帳款')
       return
     }
 
     const amount = parseFloat(paymentAmount)
+    const selectedTotal = getSelectedTotal()
+
     if (isNaN(amount) || amount <= 0) {
       setError('請輸入正確的金額')
       return
@@ -88,43 +186,35 @@ export default function APPage() {
     setError('')
 
     try {
-      // Get partner_code from first selected account
-      const firstAccount = accounts.find((a) => a.id === selectedAccounts[0])
-      if (!firstAccount) {
-        setError('找不到帳款資料')
-        return
-      }
-
-      // Allocate amount proportionally
+      // 按比例分配金額
       let remaining = amount
-      const allocations = selectedAccounts.map((accountId, index) => {
-        const account = accounts.find((a) => a.id === accountId)!
-        const isLast = index === selectedAccounts.length - 1
+      const allocations = Array.from(selectedAccounts).map((accountId, index, arr) => {
+        const account = vendorGroups
+          .flatMap(g => g.accounts)
+          .find(a => a.id === accountId)!
 
-        let allocatedAmount
-        if (isLast) {
-          allocatedAmount = remaining
-        } else {
-          allocatedAmount = Math.min(account.balance, remaining)
-        }
+        const isLast = index === arr.length - 1
+        const allocatedAmount = isLast
+          ? remaining
+          : Math.min(account.balance, remaining)
 
         remaining -= allocatedAmount
 
         return {
           partner_account_id: accountId,
-          amount: allocatedAmount,
+          amount: allocatedAmount
         }
-      }).filter((a) => a.amount > 0)
+      }).filter(a => a.amount > 0)
 
       const res = await fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          partner_code: firstAccount.partner_code,
+          partner_code: currentVendor,
           method: paymentMethod,
           amount,
-          allocations,
-        }),
+          allocations
+        })
       })
 
       const data = await res.json()
@@ -132,8 +222,9 @@ export default function APPage() {
       if (data.ok) {
         alert('付款成功！')
         setShowPaymentModal(false)
-        setSelectedAccounts([])
+        setSelectedAccounts(new Set())
         setPaymentAmount('')
+        setCurrentVendor(null)
         fetchAccounts()
       } else {
         setError(data.error || '付款失敗')
@@ -145,60 +236,40 @@ export default function APPage() {
     }
   }
 
-  const unpaidAccounts = accounts.filter((a) => a.status === 'unpaid')
-  const partialAccounts = accounts.filter((a) => a.status === 'partial')
-  const overdueAccounts = accounts.filter(
-    (a) =>
-      a.status !== 'paid' &&
-      new Date(a.due_date) < new Date()
-  )
+  const totalUnpaid = vendorGroups.reduce((sum, g) => sum + g.total_balance, 0)
+  const totalVendors = vendorGroups.filter(g => g.unpaid_count > 0).length
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">應付帳款</h1>
-          <button
-            onClick={() => setShowPaymentModal(true)}
-            disabled={selectedAccounts.length === 0}
-            className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:bg-gray-300"
-          >
-            付款 {selectedAccounts.length > 0 && `(${selectedAccounts.length})`}
-          </button>
         </div>
 
-        {/* Summary cards */}
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+        {/* Summary */}
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-lg bg-white p-4 shadow">
             <div className="text-sm text-gray-900">未付總額</div>
             <div className="text-2xl font-bold text-gray-900">
-              {formatCurrency(unpaidAccounts.reduce((sum, a) => sum + a.balance, 0))}
+              {formatCurrency(totalUnpaid)}
             </div>
-            <div className="text-sm text-gray-900">{unpaidAccounts.length} 筆</div>
-          </div>
-
-          <div className="rounded-lg bg-white p-4 shadow">
-            <div className="text-sm text-gray-900">部分付款</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {formatCurrency(partialAccounts.reduce((sum, a) => sum + a.balance, 0))}
-            </div>
-            <div className="text-sm text-gray-900">{partialAccounts.length} 筆</div>
-          </div>
-
-          <div className="rounded-lg bg-white p-4 shadow">
-            <div className="text-sm text-red-600">逾期未付</div>
-            <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(overdueAccounts.reduce((sum, a) => sum + a.balance, 0))}
-            </div>
-            <div className="text-sm text-red-600">{overdueAccounts.length} 筆</div>
+            <div className="text-sm text-gray-900">{totalVendors} 家廠商</div>
           </div>
 
           <div className="rounded-lg bg-white p-4 shadow">
             <div className="text-sm text-gray-900">已選擇</div>
             <div className="text-2xl font-bold text-blue-600">
-              {formatCurrency(selectedTotal)}
+              {formatCurrency(getSelectedTotal())}
             </div>
-            <div className="text-sm text-gray-900">{selectedAccounts.length} 筆</div>
+            <div className="text-sm text-gray-900">{selectedAccounts.size} 筆</div>
+          </div>
+
+          <div className="rounded-lg bg-white p-4 shadow">
+            <div className="text-sm text-gray-900">單據總數</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {vendorGroups.reduce((sum, g) => sum + g.unpaid_count, 0)}
+            </div>
+            <div className="text-sm text-gray-900">筆未付</div>
           </div>
         </div>
 
@@ -221,122 +292,166 @@ export default function APPage() {
           </form>
         </div>
 
-        {/* Accounts table */}
+        {/* Vendor Groups */}
         <div className="rounded-lg bg-white shadow">
           {loading ? (
             <div className="p-8 text-center text-gray-900">載入中...</div>
-          ) : accounts.length === 0 ? (
+          ) : vendorGroups.length === 0 ? (
             <div className="p-8 text-center text-gray-900">沒有應付帳款</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left">
+            <div className="divide-y divide-gray-200">
+              {vendorGroups.map((group) => {
+                const isExpanded = expandedVendors.has(group.partner_code)
+                const unpaidAccounts = group.accounts.filter(a => a.status !== 'paid')
+                const allSelected = unpaidAccounts.length > 0 &&
+                  unpaidAccounts.every(a => selectedAccounts.has(a.id))
+
+                return (
+                  <div key={group.partner_code}>
+                    {/* Vendor Header */}
+                    <div className="flex items-center gap-4 p-4 hover:bg-gray-50">
                       <input
                         type="checkbox"
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedAccounts(
-                              accounts
-                                .filter((a) => a.status !== 'paid')
-                                .map((a) => a.id)
-                            )
-                          } else {
-                            setSelectedAccounts([])
-                          }
-                        }}
-                        checked={
-                          selectedAccounts.length > 0 &&
-                          selectedAccounts.length ===
-                            accounts.filter((a) => a.status !== 'paid').length
-                        }
+                        checked={allSelected}
+                        onChange={(e) => selectAllForVendor(group.partner_code, e.target.checked)}
+                        disabled={unpaidAccounts.length === 0}
+                        className="h-4 w-4"
+                        onClick={(e) => e.stopPropagation()}
                       />
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                      廠商名稱
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                      單據類型
-                    </th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-                      應付金額
-                    </th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-                      已付金額
-                    </th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
-                      餘額
-                    </th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                      到期日
-                    </th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">
-                      狀態
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {accounts.map((account) => {
-                    const isOverdue =
-                      account.status !== 'paid' &&
-                      new Date(account.due_date) < new Date()
 
-                    return (
-                      <tr key={account.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedAccounts.includes(account.id)}
-                            onChange={() => toggleAccount(account.id)}
-                            disabled={account.status === 'paid'}
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {account.vendors?.vendor_name || account.partner_code}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {account.ref_type === 'purchase' ? '進貨' : account.ref_type}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-900">
-                          {formatCurrency(account.amount)}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-900">
-                          {formatCurrency(account.received_paid)}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
-                          {formatCurrency(account.balance)}
-                        </td>
-                        <td
-                          className={`px-6 py-4 text-sm ${
-                            isOverdue ? 'font-semibold text-red-600' : 'text-gray-900'
-                          }`}
-                        >
-                          {formatDate(account.due_date)}
-                          {isOverdue && ' (逾期)'}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span
-                            className={`inline-block rounded px-2 py-1 text-xs ${
-                              account.status === 'paid'
-                                ? 'bg-green-100 text-green-800'
-                                : account.status === 'partial'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {account.status === 'paid'
-                              ? '已付清'
-                              : account.status === 'partial'
-                              ? '部分付款'
-                              : '未付'}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() => toggleVendor(group.partner_code)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-blue-600">
+                              {isExpanded ? '▼' : '▶'}
+                            </span>
+                            <span className="font-semibold text-gray-900">
+                              {group.vendor_name}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              ({group.partner_code})
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="text-sm text-gray-500">未付款</div>
+                              <div className="text-lg font-bold text-gray-900">
+                                {formatCurrency(group.total_balance)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {group.unpaid_count} 筆單據
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // 自動選擇該廠商所有未付單據
+                          selectAllForVendor(group.partner_code, true)
+                          openPaymentModal(group.partner_code)
+                        }}
+                        disabled={group.total_balance === 0}
+                        className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:bg-gray-300"
+                      >
+                        付款
+                      </button>
+                    </div>
+
+                    {/* Account Details */}
+                    {isExpanded && (
+                      <div className="bg-gray-50 px-4 pb-4">
+                        <table className="w-full">
+                          <thead className="border-b">
+                            <tr>
+                              <th className="pb-2 text-left text-xs font-semibold text-gray-900"></th>
+                              <th className="pb-2 text-left text-xs font-semibold text-gray-900">進貨單號</th>
+                              <th className="pb-2 text-left text-xs font-semibold text-gray-900">商品</th>
+                              <th className="pb-2 text-right text-xs font-semibold text-gray-900">數量</th>
+                              <th className="pb-2 text-right text-xs font-semibold text-gray-900">應付金額</th>
+                              <th className="pb-2 text-right text-xs font-semibold text-gray-900">已付金額</th>
+                              <th className="pb-2 text-right text-xs font-semibold text-gray-900">餘額</th>
+                              <th className="pb-2 text-left text-xs font-semibold text-gray-900">到期日</th>
+                              <th className="pb-2 text-center text-xs font-semibold text-gray-900">狀態</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {group.accounts.map((account) => {
+                              const isOverdue = account.status !== 'paid' &&
+                                new Date(account.due_date) < new Date()
+
+                              return (
+                                <tr key={account.id} className="hover:bg-white">
+                                  <td className="py-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedAccounts.has(account.id)}
+                                      onChange={() => toggleAccount(account.id)}
+                                      disabled={account.status === 'paid'}
+                                      className="h-4 w-4"
+                                    />
+                                  </td>
+                                  <td className="py-2 text-sm text-gray-900">
+                                    {account.ref_no}
+                                  </td>
+                                  <td className="py-2 text-sm text-gray-900">
+                                    {account.purchase_item ? (
+                                      <div>
+                                        <div className="font-medium">{account.purchase_item.products.name}</div>
+                                        <div className="text-xs text-gray-500">{account.purchase_item.products.item_code}</div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 text-right text-sm text-gray-900">
+                                    {account.purchase_item ? (
+                                      `${account.purchase_item.quantity} ${account.purchase_item.products.unit}`
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 text-right text-sm text-gray-900">
+                                    {formatCurrency(account.amount)}
+                                  </td>
+                                  <td className="py-2 text-right text-sm text-gray-900">
+                                    {formatCurrency(account.received_paid)}
+                                  </td>
+                                  <td className="py-2 text-right text-sm font-semibold text-gray-900">
+                                    {formatCurrency(account.balance)}
+                                  </td>
+                                  <td className={`py-2 text-sm ${isOverdue ? 'font-semibold text-red-600' : 'text-gray-900'}`}>
+                                    {formatDate(account.due_date)}
+                                    {isOverdue && ' (逾期)'}
+                                  </td>
+                                  <td className="py-2 text-center">
+                                    <span className={`inline-block rounded px-2 py-1 text-xs ${
+                                      account.status === 'paid'
+                                        ? 'bg-green-100 text-green-800'
+                                        : account.status === 'partial'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {account.status === 'paid' ? '已付清' :
+                                       account.status === 'partial' ? '部分付款' : '未付'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -344,7 +459,7 @@ export default function APPage() {
 
       {/* Payment Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6">
             <h3 className="mb-4 text-xl font-semibold text-gray-900">付款</h3>
 
@@ -354,10 +469,10 @@ export default function APPage() {
 
             <div className="mb-4">
               <label className="mb-1 block text-sm font-medium text-gray-900">
-                已選擇 {selectedAccounts.length} 筆帳款
+                已選擇 {selectedAccounts.size} 筆帳款
               </label>
               <div className="rounded bg-gray-50 p-3 text-lg font-bold text-gray-900">
-                應付總額: {formatCurrency(selectedTotal)}
+                應付總額: {formatCurrency(getSelectedTotal())}
               </div>
             </div>
 
@@ -366,16 +481,25 @@ export default function APPage() {
                 付款金額 *
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                min="0"
-                step="0.01"
-                max={selectedTotal}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '' || /^\d*$/.test(v)) {
+                    setPaymentAmount(v)
+                  }
+                }}
                 className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900"
                 placeholder="輸入付款金額"
                 autoFocus
               />
+              <button
+                onClick={() => setPaymentAmount(String(getSelectedTotal()))}
+                className="mt-2 text-sm text-blue-600 hover:underline"
+              >
+                全額付款
+              </button>
             </div>
 
             <div className="mb-6">
@@ -384,7 +508,7 @@ export default function APPage() {
               </label>
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900"
               >
                 <option value="cash">現金</option>
@@ -406,6 +530,7 @@ export default function APPage() {
                   setShowPaymentModal(false)
                   setError('')
                   setPaymentAmount('')
+                  setCurrentVendor(null)
                 }}
                 className="flex-1 rounded border border-gray-300 px-4 py-2 text-gray-900 hover:bg-gray-50"
               >

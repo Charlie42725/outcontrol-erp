@@ -49,17 +49,33 @@ export async function GET(request: NextRequest) {
       .select('vendor_code, vendor_name')
       .in('vendor_code', vendorCodes)
 
-    // Map vendor names to accounts
+    // Fetch purchase item details for accounts with purchase_item_id
+    const itemIds = (accounts as any[])?.filter(a => a.purchase_item_id).map(a => a.purchase_item_id) || []
+    let itemsMap = new Map()
+
+    if (itemIds.length > 0) {
+      const { data: items } = await supabaseServer
+        .from('purchase_items')
+        .select('id, quantity, cost, subtotal, product_id, products:product_id(name, item_code, unit)')
+        .in('id', itemIds)
+
+      itemsMap = new Map(
+        (items as any[])?.map(item => [item.id, item]) || []
+      )
+    }
+
+    // Map vendor names and product info to accounts
     const vendorsMap = new Map(
       (vendors as any[])?.map(v => [v.vendor_code, v]) || []
     )
 
-    const accountsWithVendors = (accounts as any[])?.map(account => ({
+    const accountsWithDetails = (accounts as any[])?.map(account => ({
       ...account,
-      vendors: vendorsMap.get(account.partner_code) || null
+      vendors: vendorsMap.get(account.partner_code) || null,
+      purchase_item: account.purchase_item_id ? itemsMap.get(account.purchase_item_id) : null
     }))
 
-    return NextResponse.json({ ok: true, data: accountsWithVendors })
+    return NextResponse.json({ ok: true, data: accountsWithDetails })
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: 'Internal server error' },
