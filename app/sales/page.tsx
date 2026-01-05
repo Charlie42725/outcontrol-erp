@@ -39,6 +39,7 @@ export default function SalesPage() {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
   const [keyword, setKeyword] = useState('')
   const [productKeyword, setProductKeyword] = useState('')
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -76,6 +77,32 @@ export default function SalesPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     fetchSales()
+  }
+
+  const handleDelete = async (id: string, saleNo: string) => {
+    if (!confirm(`確定要刪除銷售單 ${saleNo} 嗎？\n\n此操作將會回補庫存，且無法復原。`)) {
+      return
+    }
+
+    setDeleting(id)
+    try {
+      const res = await fetch(`/api/sales/${id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await res.json()
+
+      if (data.ok) {
+        alert('刪除成功，庫存已回補')
+        fetchSales()
+      } else {
+        alert(`刪除失敗：${data.error}`)
+      }
+    } catch (err) {
+      alert('刪除失敗')
+    } finally {
+      setDeleting(null)
+    }
   }
 
   return (
@@ -135,6 +162,7 @@ export default function SalesPage() {
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">總金額</th>
                     <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">付款</th>
                     <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">狀態</th>
+                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -202,10 +230,19 @@ export default function SalesPage() {
                               : '草稿'}
                           </span>
                         </td>
+                        <td className="px-6 py-4 text-center text-sm" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleDelete(sale.id, sale.sale_no)}
+                            disabled={deleting === sale.id}
+                            className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {deleting === sale.id ? '刪除中...' : '刪除'}
+                          </button>
+                        </td>
                       </tr>
                       {expandedRows.has(sale.id) && sale.sale_items && (
                         <tr key={`${sale.id}-details`}>
-                          <td colSpan={10} className="bg-gray-50 px-6 py-4">
+                          <td colSpan={11} className="bg-gray-50 px-6 py-4">
                             <div className="rounded-lg border border-gray-200 bg-white p-4">
                               <h4 className="mb-3 font-semibold text-gray-900">銷售明細</h4>
                               <table className="w-full">

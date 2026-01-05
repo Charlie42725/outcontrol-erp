@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
 
+type SortField = 'item_code' | 'name' | 'price' | 'avg_cost' | 'stock'
+type SortOrder = 'asc' | 'desc'
+
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -17,6 +20,8 @@ export default function ProductsPage() {
     total: 0,
     totalPages: 0
   })
+  const [sortBy, setSortBy] = useState<SortField>('item_code')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
   const fetchProducts = async (currentPage: number = page) => {
     setLoading(true)
@@ -95,6 +100,37 @@ export default function ProductsPage() {
     }
   }
 
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      // Toggle order if same field
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Default to asc for new field
+      setSortBy(field)
+      setSortOrder('asc')
+    }
+  }
+
+  // Sort products
+  const sortedProducts = [...products].sort((a, b) => {
+    const aValue = a[sortBy]
+    const bValue = b[sortBy]
+
+    if (aValue === null || aValue === undefined) return 1
+    if (bValue === null || bValue === undefined) return -1
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
+    return 0
+  })
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortBy !== field) {
+      return <span className="ml-1 text-gray-400">↕</span>
+    }
+    return <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="mx-auto max-w-7xl">
@@ -171,18 +207,58 @@ export default function ProductsPage() {
               <table className="w-full">
                 <thead className="border-b bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">品號</th>
+                    <th
+                      className="px-6 py-3 text-left text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('item_code')}
+                    >
+                      <div className="flex items-center">
+                        品號
+                        <SortIcon field="item_code" />
+                      </div>
+                    </th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">條碼</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">商品名稱</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">售價</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">成本</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">庫存</th>
+                    <th
+                      className="px-6 py-3 text-left text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('name')}
+                    >
+                      <div className="flex items-center">
+                        商品名稱
+                        <SortIcon field="name" />
+                      </div>
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('price')}
+                    >
+                      <div className="flex items-center justify-end">
+                        售價
+                        <SortIcon field="price" />
+                      </div>
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('avg_cost')}
+                    >
+                      <div className="flex items-center justify-end">
+                        成本
+                        <SortIcon field="avg_cost" />
+                      </div>
+                    </th>
+                    <th
+                      className="px-6 py-3 text-right text-sm font-semibold text-gray-900 cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('stock')}
+                    >
+                      <div className="flex items-center justify-end">
+                        庫存
+                        <SortIcon field="stock" />
+                      </div>
+                    </th>
                     <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">狀態</th>
                     <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {products.map((product) => (
+                  {sortedProducts.map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">{product.item_code}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">{product.barcode || '-'}</td>

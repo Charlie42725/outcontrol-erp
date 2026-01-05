@@ -63,7 +63,7 @@ export async function GET(
   }
 }
 
-// DELETE /api/sales/:id - Cancel/delete sale
+// DELETE /api/sales/:id - Delete sale and restore inventory
 export async function DELETE(
   request: NextRequest,
   context: RouteContext
@@ -71,7 +71,7 @@ export async function DELETE(
   try {
     const { id } = await context.params
 
-    // Check if sale exists and get its status
+    // 1. Check if sale exists and get its status
     const { data: sale, error: fetchError } = await (supabaseServer
       .from('sales') as any)
       .select('status')
@@ -85,25 +85,56 @@ export async function DELETE(
       )
     }
 
-    // If confirmed, change to cancelled first (triggers rollback in DB)
+    // 2. If confirmed, need to restore inventory
     if (sale.status === 'confirmed') {
-      const { error: cancelError } = await (supabaseServer
-        .from('sales') as any)
-        .update({ status: 'cancelled' })
-        .eq('id', id)
+      // Get all sale items
+      const { data: items, error: itemsError } = await (supabaseServer
+        .from('sale_items') as any)
+        .select('product_id, quantity')
+        .eq('sale_id', id)
 
-      if (cancelError) {
+      if (itemsError) {
         return NextResponse.json(
-          { ok: false, error: cancelError.message },
+          { ok: false, error: itemsError.message },
           { status: 500 }
         )
       }
+
+      // Restore inventory for each item
+      for (const item of items || []) {
+        // Get current stock
+        const { data: product, error: fetchProductError } = await (supabaseServer
+          .from('products') as any)
+          .select('stock')
+          .eq('id', item.product_id)
+          .single()
+
+        if (fetchProductError) {
+          return NextResponse.json(
+            { ok: false, error: `Failed to fetch product: ${fetchProductError.message}` },
+            { status: 500 }
+          )
+        }
+
+        // Update stock by adding back the quantity
+        const { error: updateError } = await (supabaseServer
+          .from('products') as any)
+          .update({ stock: product.stock + item.quantity })
+          .eq('id', item.product_id)
+
+        if (updateError) {
+          return NextResponse.json(
+            { ok: false, error: `Failed to restore inventory: ${updateError.message}` },
+            { status: 500 }
+          )
+        }
+      }
     }
 
-    // Delete sale items
+    // 3. Delete sale items
     await (supabaseServer.from('sale_items') as any).delete().eq('sale_id', id)
 
-    // Delete sale
+    // 4. Delete sale
     const { error: deleteError } = await (supabaseServer
       .from('sales') as any)
       .delete()

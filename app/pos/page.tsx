@@ -31,7 +31,7 @@ export default function POSPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [discountType, setDiscountType] = useState<'none' | 'percent' | 'amount'>('none')
-  const [discountValue, setDiscountValue] = useState(0)
+  const [discountValue, setDiscountValue] = useState('')
   const barcodeInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -115,13 +115,14 @@ export default function POSPage() {
   }, 0)
 
   let discountAmount = 0
+  const discountNum = parseFloat(discountValue) || 0
   if (discountType === 'percent') {
-    discountAmount = (subtotal * discountValue) / 100
+    discountAmount = (subtotal * discountNum) / 100
   } else if (discountType === 'amount') {
-    discountAmount = discountValue
+    discountAmount = discountNum
   }
 
-  const total = Math.max(0, subtotal - discountAmount)
+  const total = subtotal - discountAmount
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
@@ -148,7 +149,7 @@ export default function POSPage() {
           is_paid: isPaid,
           note: note || undefined,
           discount_type: discountType,
-          discount_value: discountValue,
+          discount_value: parseFloat(discountValue) || 0,
           items: cart.map((item) => ({
             product_id: item.product_id,
             quantity: item.quantity,
@@ -166,7 +167,7 @@ export default function POSPage() {
         setIsPaid(true)
         setNote('')
         setDiscountType('none')
-        setDiscountValue(0)
+        setDiscountValue('')
         alert(`銷售完成！單號：${data.data.sale_no}`)
       } else {
         setError(data.error || '結帳失敗')
@@ -439,7 +440,7 @@ export default function POSPage() {
                 <button
                   onClick={() => {
                     setDiscountType('none')
-                    setDiscountValue(0)
+                    setDiscountValue('')
                   }}
                   className={`py-1.5 rounded font-bold border-2 transition-all text-xs text-black ${
                     discountType === 'none'
@@ -472,12 +473,16 @@ export default function POSPage() {
               </div>
               {discountType !== 'none' && (
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={discountValue}
-                  onChange={(e) => setDiscountValue(parseFloat(e.target.value) || 0)}
-                  min="0"
-                  max={discountType === 'percent' ? 100 : subtotal}
-                  step={discountType === 'percent' ? 1 : 1}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    // 只允許空字串或純數字（整數）
+                    if (v === '' || /^\d*$/.test(v)) {
+                      setDiscountValue(v)
+                    }
+                  }}
                   className="w-full border-2 border-gray-400 rounded px-2 py-1.5 text-sm text-black focus:border-black focus:outline-none"
                   placeholder={discountType === 'percent' ? '折扣 %' : '折扣金額'}
                 />
