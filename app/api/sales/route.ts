@@ -55,12 +55,12 @@ export async function GET(request: NextRequest) {
     // Search by keyword in sale_no, customer_code, or customer_name
     if (keyword) {
       // First find customer codes that match the keyword
-      const { data: matchingCustomers } = await supabaseServer
-        .from('customers')
+      const { data: matchingCustomers } = await (supabaseServer
+        .from('customers') as any)
         .select('customer_code')
         .ilike('customer_name', `%${keyword}%`)
 
-      const matchingCodes = matchingCustomers?.map(c => c.customer_code) || []
+      const matchingCodes = matchingCustomers?.map((c: any) => c.customer_code) || []
 
       // Build the search query
       if (matchingCodes.length > 0) {

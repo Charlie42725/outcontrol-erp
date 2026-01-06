@@ -26,6 +26,7 @@ type IchibanKuji = {
   name: string
   total_draws: number
   avg_cost: number
+  price?: number
   is_active: boolean
   created_at: string
   ichiban_kuji_prizes: Prize[]
@@ -160,11 +161,11 @@ export default function IchibanKujiPage() {
                           {formatCurrency(kuji.avg_cost)}
                         </td>
                         <td className="px-6 py-4 text-right text-sm font-semibold text-green-600">
-                          {formatCurrency(kuji.price)}
+                          {formatCurrency(kuji.price || 0)}
                         </td>
                         <td className="px-6 py-4 text-right text-sm font-bold">
-                          <span className={kuji.price > kuji.avg_cost ? 'text-green-600' : 'text-red-600'}>
-                            {formatCurrency(kuji.price - kuji.avg_cost)}
+                          <span className={(kuji.price || 0) > kuji.avg_cost ? 'text-green-600' : 'text-red-600'}>
+                            {formatCurrency((kuji.price || 0) - kuji.avg_cost)}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center text-sm">
