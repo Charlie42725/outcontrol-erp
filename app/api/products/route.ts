@@ -13,11 +13,12 @@ export async function GET(request: NextRequest) {
     const all = searchParams.get('all') === 'true' // New parameter to get all products
     const page = parseInt(searchParams.get('page') || '1')
     const pageSize = 50
+    const sortBy = searchParams.get('sortBy') || 'updated_at'
+    const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     let query = supabaseServer
       .from('products')
       .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
 
     // Filter by active status
     if (active !== null) {
@@ -28,6 +29,9 @@ export async function GET(request: NextRequest) {
     if (keyword) {
       query = query.or(`name.ilike.%${keyword}%,item_code.ilike.%${keyword}%,barcode.ilike.%${keyword}%`)
     }
+
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' })
 
     // Apply pagination (unless all=true)
     if (!all) {

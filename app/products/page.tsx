@@ -400,13 +400,17 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                         {product.updated_at
-                          ? new Date(product.updated_at).toLocaleString('zh-TW', {
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
+                          ? (() => {
+                              const date = new Date(product.updated_at + 'Z')
+                              return date.toLocaleString('zh-TW', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                              })
+                            })()
                           : '-'
                         }
                       </td>
