@@ -263,6 +263,7 @@ export default function POSPage() {
       let remaining = totalCount
       let totalComboPrice = 0
       let comboDrawsUsed = 0
+      const priceBreakdown: { count: number; pricePerItem: number }[] = []
 
       for (const combo of comboPrices) {
         const sets = Math.floor(remaining / combo.draws)
@@ -270,20 +271,40 @@ export default function POSPage() {
           totalComboPrice += sets * combo.price
           comboDrawsUsed += sets * combo.draws
           remaining -= sets * combo.draws
+          // Track price per item for this combo
+          priceBreakdown.push({
+            count: sets * combo.draws,
+            pricePerItem: combo.price / combo.draws
+          })
         }
       }
 
       // Remaining items use original price
-      const remainingPrice = remaining * originalPrice
-      const totalPrice = totalComboPrice + remainingPrice
+      if (remaining > 0) {
+        priceBreakdown.push({
+          count: remaining,
+          pricePerItem: originalPrice
+        })
+      }
 
-      // Calculate average price per item
-      const avgPrice = totalPrice / totalCount
-
-      // Apply this average price to all items in this group
+      // Apply prices to items based on their position
+      let itemIndex = 0
       adjustedCart = adjustedCart.map(item => {
         if (item.ichiban_kuji_id === kuji_id) {
-          return { ...item, price: avgPrice }
+          // Find which price bracket this item falls into
+          let accumulatedCount = 0
+          let itemPrice = originalPrice
+
+          for (const bracket of priceBreakdown) {
+            if (itemIndex < accumulatedCount + bracket.count) {
+              itemPrice = bracket.pricePerItem
+              break
+            }
+            accumulatedCount += bracket.count
+          }
+
+          itemIndex += item.quantity
+          return { ...item, price: itemPrice }
         }
         return item
       })
