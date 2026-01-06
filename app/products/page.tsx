@@ -33,6 +33,8 @@ export default function ProductsPage() {
       if (keyword) params.set('keyword', keyword)
       if (activeFilter !== null) params.set('active', String(activeFilter))
       params.set('page', String(currentPage))
+      params.set('sortBy', sortBy)
+      params.set('sortOrder', sortOrder)
 
       const res = await fetch(`/api/products?${params}`)
       const data = await res.json()
@@ -70,7 +72,7 @@ export default function ProductsPage() {
   useEffect(() => {
     setPage(1)
     fetchProducts(1)
-  }, [activeFilter])
+  }, [activeFilter, sortBy, sortOrder])
 
   useEffect(() => {
     fetchLowStockProducts()
@@ -132,30 +134,11 @@ export default function ProductsPage() {
       // Toggle order if same field
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
     } else {
-      // Default to asc for new field
+      // Default to desc for new field
       setSortBy(field)
-      setSortOrder('asc')
+      setSortOrder('desc')
     }
   }
-
-  // Sort products
-  const sortedProducts = [...products].sort((a, b) => {
-    let aValue = a[sortBy]
-    let bValue = b[sortBy]
-
-    // Handle date sorting
-    if (sortBy === 'updated_at') {
-      aValue = aValue ? new Date(aValue as string).getTime() : 0
-      bValue = bValue ? new Date(bValue as string).getTime() : 0
-    }
-
-    if (aValue === null || aValue === undefined) return 1
-    if (bValue === null || bValue === undefined) return -1
-
-    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
-    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
-    return 0
-  })
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortBy !== field) {
@@ -374,7 +357,7 @@ export default function ProductsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {sortedProducts.map((product) => (
+                  {products.map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{product.item_code}</td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{product.barcode || '-'}</td>
