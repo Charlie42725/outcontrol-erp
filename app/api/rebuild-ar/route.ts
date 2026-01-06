@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     // Get all sales
     const { data: sales, error: salesError } = await supabaseServer
       .from('sales')
-      .select('*, sale_items(*)')
+      .select('*, sale_items(*)') as any
 
     if (salesError) {
       return NextResponse.json(
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         .from('partner_accounts')
         .select('id, sale_item_id')
         .eq('ref_type', 'sale')
-        .eq('ref_id', sale.id)
+        .eq('ref_id', sale.id) as any
 
       // If all items already have AR records, skip
       const items = sale.sale_items || []
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const existingItemIds = new Set(existingAR?.map(ar => ar.sale_item_id).filter(Boolean))
+      const existingItemIds = new Set(existingAR?.map((ar: any) => ar.sale_item_id).filter(Boolean))
       const itemsToCreate = items.filter((item: any) => !existingItemIds.has(item.id))
 
       if (itemsToCreate.length === 0) {
@@ -66,10 +66,10 @@ export async function POST(request: NextRequest) {
           .from('partner_accounts')
           .select('amount, received_paid')
           .eq('ref_type', 'sale')
-          .eq('ref_id', sale.id)
+          .eq('ref_id', sale.id) as any
 
-        totalARAmount = existingARDetails?.reduce((sum, ar) => sum + ar.amount, 0) || 0
-        totalPaid = existingARDetails?.reduce((sum, ar) => sum + ar.received_paid, 0) || 0
+        totalARAmount = existingARDetails?.reduce((sum: number, ar: any) => sum + ar.amount, 0) || 0
+        totalPaid = existingARDetails?.reduce((sum: number, ar: any) => sum + ar.received_paid, 0) || 0
       }
 
       // Calculate remaining amount to allocate
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       const remainingAmount = sale.total - totalARAmount
 
       // Delete old AR records without sale_item_id
-      if (existingAR && existingAR.some(ar => !ar.sale_item_id)) {
+      if (existingAR && existingAR.some((ar: any) => !ar.sale_item_id)) {
         await supabaseServer
           .from('partner_accounts')
           .delete()

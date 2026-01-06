@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       .eq('partner_type', 'vendor')
       .eq('direction', 'AP')
       .eq('ref_type', 'purchase')
-      .is('purchase_item_id', null)
+      .is('purchase_item_id', null) as any
 
     if (accountsError) {
       return NextResponse.json(
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       // Insert new records
       const { error: insertError } = await supabaseServer
         .from('partner_accounts')
-        .insert(newRecords)
+        .insert(newRecords as any)
 
       if (insertError) {
         results.push({

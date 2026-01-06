@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const { data: purchases, error: purchasesError } = await supabaseServer
       .from('purchases')
       .select('*, purchase_items(*)')
-      .eq('is_paid', false)
+      .eq('is_paid', false) as any
 
     if (purchasesError) {
       return NextResponse.json(

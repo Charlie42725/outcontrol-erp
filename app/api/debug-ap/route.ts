@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .eq('partner_type', 'vendor')
       .eq('direction', 'AP')
-      .limit(5)
+      .limit(5) as any
 
     if (error) {
       return NextResponse.json(
@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get purchase items info
-    const itemIds = accounts?.filter(a => a.purchase_item_id).map(a => a.purchase_item_id) || []
+    const itemIds = accounts?.filter((a: any) => a.purchase_item_id).map((a: any) => a.purchase_item_id) || []
     
-    let items = []
+    let items: any[] = []
     if (itemIds.length > 0) {
       const { data } = await supabaseServer
         .from('purchase_items')
@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Get purchase info
-    const purchaseIds = [...new Set(accounts?.filter(a => a.ref_type === 'purchase').map(a => a.ref_id) || [])]
+    const purchaseIds = [...new Set(accounts?.filter((a: any) => a.ref_type === 'purchase').map((a: any) => a.ref_id) || [])]
     
-    let purchases = []
+    let purchases: any[] = []
     if (purchaseIds.length > 0) {
       const { data } = await supabaseServer
         .from('purchases')
@@ -51,8 +51,8 @@ export async function GET(request: NextRequest) {
         purchases,
         summary: {
           total_accounts: accounts?.length || 0,
-          accounts_with_item_id: accounts?.filter(a => a.purchase_item_id).length || 0,
-          accounts_without_item_id: accounts?.filter(a => !a.purchase_item_id).length || 0,
+          accounts_with_item_id: accounts?.filter((a: any) => a.purchase_item_id).length || 0,
+          accounts_without_item_id: accounts?.filter((a: any) => !a.purchase_item_id).length || 0,
         }
       }
     })

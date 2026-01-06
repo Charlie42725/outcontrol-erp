@@ -172,7 +172,7 @@ export default function SalesPage() {
                   {sales.map((sale) => (
                     <React.Fragment key={sale.id}>
                       <tr
-                        className="hover:bg-gray-50 cursor-pointer"
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                         onClick={() => toggleRow(sale.id)}
                       >
                         <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -248,7 +248,7 @@ export default function SalesPage() {
                       {expandedRows.has(sale.id) && sale.sale_items && (
                         <tr key={`${sale.id}-details`}>
                           <td colSpan={11} className="bg-gray-50 dark:bg-gray-900 px-6 py-4">
-                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white p-4">
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
                               <h4 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">銷售明細</h4>
                               <table className="w-full">
                                 <thead className="border-b">
