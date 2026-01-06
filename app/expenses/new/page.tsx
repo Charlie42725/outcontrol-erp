@@ -89,7 +89,7 @@ export default function NewExpensePage() {
                   setFormData({ ...formData, date: e.target.value })
                 }
                 required
-                className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none"
               />
             </div>
 
@@ -104,7 +104,7 @@ export default function NewExpensePage() {
                   setFormData({ ...formData, category: e.target.value })
                 }
                 required
-                className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none"
               >
                 {EXPENSE_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
@@ -130,7 +130,7 @@ export default function NewExpensePage() {
                   required
                   min="1"
                   step="1"
-                  className="w-full rounded border border-gray-300 py-2 pl-8 pr-3 focus:border-blue-500 focus:outline-none"
+                  className="w-full rounded border border-gray-300 py-2 pl-8 pr-3 text-gray-900 placeholder:text-gray-900 focus:border-blue-500 focus:outline-none"
                   placeholder="0"
                 />
               </div>
@@ -152,7 +152,7 @@ export default function NewExpensePage() {
                   setFormData({ ...formData, note: e.target.value })
                 }
                 rows={3}
-                className="w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-900 focus:border-blue-500 focus:outline-none"
                 placeholder="選填"
               />
             </div>
