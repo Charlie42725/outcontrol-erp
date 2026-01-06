@@ -403,7 +403,7 @@ export default function ProductsPage() {
                       </td>
                       <td className="px-6 py-4 text-center text-sm">
                         <span
-                          className={`inline-block rounded px-2 py-1 text-xs ${
+                          className={`inline-block rounded px-2 py-1 text-xs whitespace-nowrap ${
                             product.is_active
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
