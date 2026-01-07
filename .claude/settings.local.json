@@ -17,7 +17,8 @@
       "Bash(done)",
       "Bash(npx supabase db reset:*)",
       "Bash(node scripts/generate-password.js:*)",
-      "Bash(node scripts/test-login.js:*)"
+      "Bash(node scripts/test-login.js:*)",
+      "Bash(node scripts/generate-icons.js:*)"
     ]
   }
 }

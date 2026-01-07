@@ -69,31 +69,31 @@ export default function Navigation() {
     : navItems
 
   return (
-    <nav className="border-b bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <div className="mx-auto max-w-7xl px-4">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-4 md:gap-8">
-            <Link href="/" className="flex items-center gap-2">
+    <nav className="sticky top-0 z-50 border-b bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+      <div className="mx-auto max-w-full px-4 lg:px-6">
+        <div className="flex h-16 items-center justify-between gap-4">
+          <div className="flex items-center gap-6 lg:gap-8">
+            <Link href="/" className="flex items-center gap-2.5 shrink-0">
               <Image
                 src="/logo.jpg"
                 alt="ToyFlow ERP Logo"
-                width={40}
-                height={40}
-                className="rounded"
+                width={44}
+                height={44}
+                className="rounded-lg shadow-sm"
               />
-              <span className="text-xl font-bold text-blue-600 dark:text-blue-400">失控 ERP</span>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">失控 ERP</span>
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden gap-1 lg:flex xl:gap-2">
+            <div className="hidden gap-1.5 lg:flex xl:gap-2">
               {filteredNavItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`whitespace-nowrap rounded px-2 py-2 text-xs font-medium transition-colors xl:text-sm ${
+                  className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition-all duration-200 ${
                     pathname === item.href
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
                   }`}
                 >
                   {item.label}
@@ -105,14 +105,14 @@ export default function Navigation() {
           <div className="flex items-center gap-2">
             {/* User Info */}
             {user && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-650 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">
+                <span className="text-xs font-semibold text-gray-800 dark:text-gray-100">
                   {user.username}
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded ${
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm ${
                   user.role === 'admin'
-                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-                    : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+                    : 'bg-gradient-to-r from-green-500 to-green-600 text-white'
                 }`}>
                   {user.role === 'admin' ? '管理員' : '員工'}
                 </span>
@@ -124,9 +124,12 @@ export default function Navigation() {
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="hidden md:block px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                className="hidden md:flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200 border border-red-200 dark:border-red-800 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loggingOut ? '登出中...' : '登出'}
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                {loggingOut ? '登出中' : '登出'}
               </button>
             )}
 
@@ -135,7 +138,7 @@ export default function Navigation() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="rounded-lg p-2 text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700 lg:hidden"
+              className="rounded-xl p-2.5 text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 lg:hidden transition-all duration-200 border border-gray-200 dark:border-gray-600 hover:shadow-md"
               aria-label="切換選單"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,18 +154,18 @@ export default function Navigation() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="border-t pb-4 pt-2 dark:border-gray-700 lg:hidden">
+          <div className="border-t pb-4 pt-3 dark:border-gray-700 lg:hidden bg-gradient-to-b from-gray-50 to-white dark:from-gray-750 dark:to-gray-800">
             {/* Mobile User Info */}
             {user && (
-              <div className="flex items-center justify-between px-3 py-2 mb-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="flex items-center justify-between px-4 py-3 mb-3 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-700 dark:to-gray-650 rounded-xl mx-3 shadow-sm border border-gray-200 dark:border-gray-600">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                     {user.username}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-md shadow-sm ${
                     user.role === 'admin'
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300'
-                      : 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                      ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+                      : 'bg-gradient-to-r from-green-500 to-green-600 text-white'
                   }`}>
                     {user.role === 'admin' ? '管理員' : '員工'}
                   </span>
@@ -170,23 +173,26 @@ export default function Navigation() {
                 <button
                   onClick={handleLogout}
                   disabled={loggingOut}
-                  className="text-sm font-medium text-red-600 dark:text-red-400 disabled:opacity-50"
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-semibold text-red-600 dark:text-red-400 disabled:opacity-50 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-red-200 dark:border-red-800"
                 >
-                  {loggingOut ? '登出中...' : '登出'}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  {loggingOut ? '登出中' : '登出'}
                 </button>
               </div>
             )}
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5 px-3">
               {filteredNavItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setIsMenuOpen(false)}
-                  className={`rounded px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 shadow-sm ${
                     pathname === item.href
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-                      : 'text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700'
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-[1.02]'
+                      : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-650 border border-gray-200 dark:border-gray-600'
                   }`}
                 >
                   {item.label}

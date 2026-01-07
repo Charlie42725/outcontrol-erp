@@ -17,7 +17,14 @@ export const metadata: Metadata = {
   title: "失控ERP",
   description: "簡單好用的 ERP 系統",
   icons: {
-    icon: '/logo.jpg',
+    icon: '/icon-192.png',
+    apple: '/icon-192.png',
+  },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: '失控ERP',
   },
 };
 
