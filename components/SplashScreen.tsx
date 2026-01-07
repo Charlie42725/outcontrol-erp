@@ -47,19 +47,19 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
             stage >= 0 ? 'scale-100 opacity-100 rotate-0' : 'scale-0 opacity-0 -rotate-12'
           }`}
         >
-          <div className="relative w-[280px] h-[280px] flex items-center justify-center">
+          <div className="relative w-[360px] h-[360px] flex items-center justify-center">
             {/* Logo 外發光 - 最底層 - 超強光暈 */}
             <div className="absolute -inset-12 z-0 animate-pulse rounded-full bg-gradient-to-r from-yellow-300/50 via-orange-400/50 to-yellow-300/50 blur-[100px]" />
             <div className="absolute -inset-8 z-0 animate-pulse rounded-full bg-gradient-to-r from-yellow-400/40 via-amber-300/40 to-yellow-400/40 blur-3xl" style={{ animationDelay: '0.5s' }} />
 
             {/* Logo 圖片 - 第二層 - 白色/漸變背景 */}
-            <div className="relative z-10 rounded-2xl bg-gradient-to-br from-white via-yellow-50 to-orange-50 p-6 shadow-2xl ring-2 ring-yellow-400/30">
+            <div className="relative z-10 w-[320px] h-[320px] rounded-full bg-gradient-to-br from-white via-yellow-50 to-orange-50 p-6 shadow-2xl ring-2 ring-yellow-400/30 flex items-center justify-center">
               <img
                 src="/logo3.png"
                 alt="失控事務所"
-                width={280}
-                height={280}
-                className="drop-shadow-lg"
+                width={308}
+                height={308}
+                className="rounded-full drop-shadow-lg object-cover"
               />
             </div>
 
