@@ -27,7 +27,7 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
   }, [onFinish])
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-950">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-gradient-to-br from-gray-900 via-slate-800 to-gray-900">
       {/* 背景粒子效果 */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="splash-blob splash-blob-1" />
@@ -48,17 +48,18 @@ export default function SplashScreen({ onFinish }: SplashScreenProps) {
           }`}
         >
           <div className="relative w-[280px] h-[280px] flex items-center justify-center">
-            {/* Logo 外發光 - 最底層 */}
-            <div className="absolute -inset-8 z-0 animate-pulse rounded-full bg-gradient-to-r from-yellow-400/30 via-orange-400/30 to-yellow-400/30 blur-3xl" />
+            {/* Logo 外發光 - 最底層 - 超強光暈 */}
+            <div className="absolute -inset-12 z-0 animate-pulse rounded-full bg-gradient-to-r from-yellow-300/50 via-orange-400/50 to-yellow-300/50 blur-[100px]" />
+            <div className="absolute -inset-8 z-0 animate-pulse rounded-full bg-gradient-to-r from-yellow-400/40 via-amber-300/40 to-yellow-400/40 blur-3xl" style={{ animationDelay: '0.5s' }} />
 
-            {/* Logo 圖片 - 第二層 */}
-            <div className="relative z-10">
+            {/* Logo 圖片 - 第二層 - 白色/漸變背景 */}
+            <div className="relative z-10 rounded-2xl bg-gradient-to-br from-white via-yellow-50 to-orange-50 p-6 shadow-2xl ring-2 ring-yellow-400/30">
               <img
                 src="/logo3.png"
                 alt="失控事務所"
                 width={280}
                 height={280}
-                className="rounded-2xl shadow-2xl drop-shadow-2xl"
+                className="drop-shadow-lg"
               />
             </div>
 
