@@ -33,6 +33,8 @@ type Purchase = {
   purchase_items?: PurchaseItem[]
 }
 
+type UserRole = 'admin' | 'staff'
+
 export default function PurchasesPage() {
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +42,23 @@ export default function PurchasesPage() {
   const [keyword, setKeyword] = useState('')
   const [productKeyword, setProductKeyword] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<UserRole | null>(null)
+
+  useEffect(() => {
+    // Fetch current user role
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          setUserRole(data.data.role)
+        }
+      })
+      .catch(() => {
+        // Ignore error
+      })
+  }, [])
+
+  const isAdmin = userRole === 'admin'
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -135,13 +154,20 @@ export default function PurchasesPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">進貨單</h1>
-          <Link
-            href="/purchases/new"
-            className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            + 新增進貨
-          </Link>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">進貨單</h1>
+            {!isAdmin && (
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">員工模式：僅顯示數量資訊</p>
+            )}
+          </div>
+          {isAdmin && (
+            <Link
+              href="/purchases/new"
+              className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            >
+              + 新增進貨
+            </Link>
+          )}
         </div>
 
         {/* Search */}
@@ -189,10 +215,16 @@ export default function PurchasesPage() {
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">進貨日期</th>
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">商品數</th>
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">總數量</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">平均成本</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">總金額</th>
+                    {isAdmin && (
+                      <>
+                        <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">平均成本</th>
+                        <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">總金額</th>
+                      </>
+                    )}
                     <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">狀態</th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">操作</th>
+                    {isAdmin && (
+                      <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">操作</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -220,12 +252,16 @@ export default function PurchasesPage() {
                         <td className="px-6 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
                           {purchase.total_quantity || 0}
                         </td>
-                        <td className="px-6 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
-                          {formatCurrency(purchase.avg_cost || 0)}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
-                          {formatCurrency(purchase.total)}
-                        </td>
+                        {isAdmin && (
+                          <>
+                            <td className="px-6 py-4 text-right text-sm text-gray-900 dark:text-gray-100">
+                              {formatCurrency(purchase.avg_cost || 0)}
+                            </td>
+                            <td className="px-6 py-4 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
+                              {formatCurrency(purchase.total)}
+                            </td>
+                          </>
+                        )}
                         <td className="px-6 py-4 text-center text-sm">
                           <span
                             className={`inline-block rounded px-2 py-1 text-xs ${
@@ -243,20 +279,22 @@ export default function PurchasesPage() {
                               : '草稿'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-center text-sm" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => handleDeletePurchase(purchase.id, purchase.purchase_no)}
-                            disabled={deleting === purchase.id}
-                            className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          >
-                            {deleting === purchase.id ? '刪除中...' : '刪除'}
-                          </button>
-                        </td>
+                        {isAdmin && (
+                          <td className="px-6 py-4 text-center text-sm" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => handleDeletePurchase(purchase.id, purchase.purchase_no)}
+                              disabled={deleting === purchase.id}
+                              className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                            >
+                              {deleting === purchase.id ? '刪除中...' : '刪除'}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                       {expandedRows.has(purchase.id) && purchase.purchase_items && (
                         <tr key={`${purchase.id}-details`}>
-                          <td colSpan={9} className="bg-gray-50 dark:bg-gray-900 px-6 py-4">
-                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white p-4">
+                          <td colSpan={isAdmin ? 9 : 6} className="bg-gray-50 dark:bg-gray-900 px-6 py-4">
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
                               <h4 className="mb-3 font-semibold text-gray-900 dark:text-gray-100">進貨明細</h4>
                               <table className="w-full">
                                 <thead className="border-b">
@@ -264,34 +302,42 @@ export default function PurchasesPage() {
                                     <th className="pb-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100">品號</th>
                                     <th className="pb-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100">商品名稱</th>
                                     <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">數量</th>
-                                    <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">成本</th>
-                                    <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">小計</th>
-                                    <th className="pb-2 text-center text-xs font-semibold text-gray-900 dark:text-gray-100">操作</th>
+                                    {isAdmin && (
+                                      <>
+                                        <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">成本</th>
+                                        <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">小計</th>
+                                        <th className="pb-2 text-center text-xs font-semibold text-gray-900 dark:text-gray-100">操作</th>
+                                      </>
+                                    )}
                                   </tr>
                                 </thead>
-                                <tbody className="divide-y">
+                                <tbody className="divide-y dark:divide-gray-700">
                                   {purchase.purchase_items.map((item) => (
                                     <tr key={item.id}>
                                       <td className="py-2 text-sm text-gray-900 dark:text-gray-100">{item.products.item_code}</td>
                                       <td className="py-2 text-sm text-gray-900 dark:text-gray-100">{item.products.name}</td>
                                       <td className="py-2 text-right text-sm text-gray-900 dark:text-gray-100">
-                                        {item.quantity}
+                                        {item.quantity} {item.products.unit}
                                       </td>
-                                      <td className="py-2 text-right text-sm text-gray-900 dark:text-gray-100">
-                                        {formatCurrency(item.cost)}
-                                      </td>
-                                      <td className="py-2 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                        {formatCurrency(item.quantity * item.cost)}
-                                      </td>
-                                      <td className="py-2 text-center text-sm">
-                                        <button
-                                          onClick={() => handleDeleteItem(item.id, item.products.name, purchase.id)}
-                                          disabled={deleting === item.id}
-                                          className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                        >
-                                          {deleting === item.id ? '刪除中' : '刪除'}
-                                        </button>
-                                      </td>
+                                      {isAdmin && (
+                                        <>
+                                          <td className="py-2 text-right text-sm text-gray-900 dark:text-gray-100">
+                                            {formatCurrency(item.cost)}
+                                          </td>
+                                          <td className="py-2 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                            {formatCurrency(item.quantity * item.cost)}
+                                          </td>
+                                          <td className="py-2 text-center text-sm">
+                                            <button
+                                              onClick={() => handleDeleteItem(item.id, item.products.name, purchase.id)}
+                                              disabled={deleting === item.id}
+                                              className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                            >
+                                              {deleting === item.id ? '刪除中' : '刪除'}
+                                            </button>
+                                          </td>
+                                        </>
+                                      )}
                                     </tr>
                                   ))}
                                 </tbody>

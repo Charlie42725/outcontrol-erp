@@ -1,0 +1,57 @@
+-- Create users table for authentication
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('boss', 'employee')),
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Create index on username for faster lookups
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
+-- Add RLS policies
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+-- Allow all operations for authenticated users (we'll handle authorization in the app)
+CREATE POLICY "Allow all for authenticated users" ON users
+  FOR ALL
+  USING (true);
+
+-- Create updated_at trigger
+CREATE OR REPLACE FUNCTION update_users_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER users_updated_at
+  BEFORE UPDATE ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION update_users_updated_at();
+
+-- Insert default boss account (password: boss123)
+-- bcrypt hash of 'boss123' with 10 rounds
+INSERT INTO users (username, password_hash, role, is_active)
+VALUES (
+  'boss',
+  '$2a$10$Z8qhXjN4YP9P6LZvKz3Kp.8hXQQjqU7Pw0tJBZhBXkZ6vXx0Z4Z4m',
+  'boss',
+  true
+)
+ON CONFLICT (username) DO NOTHING;
+
+-- Insert default employee account (password: employee123)
+-- bcrypt hash of 'employee123' with 10 rounds
+INSERT INTO users (username, password_hash, role, is_active)
+VALUES (
+  'employee',
+  '$2a$10$N9qo8uLOickgx2ZoGZ6VbO5TqJCjNFq3lPjKvZ6VbO5TqJCjNFq3l',
+  'employee',
+  true
+)
+ON CONFLICT (username) DO NOTHING;
