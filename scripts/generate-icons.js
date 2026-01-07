@@ -9,11 +9,11 @@ async function generateIcons() {
   console.log('開始生成 PWA 圖標...\n')
 
   const sizes = [
-    { size: 180, name: 'apple-touch-icon.png', padding: 10, bgColor: '#2563eb' }, // iOS 專用（藍底）
-    { size: 192, name: 'icon-192.png', padding: 10, bgColor: '#2563eb' },
-    { size: 512, name: 'icon-512.png', padding: 20, bgColor: '#2563eb' },
-    { size: 192, name: 'icon-192-maskable.png', padding: 20, bgColor: '#2563eb' },
-    { size: 512, name: 'icon-512-maskable.png', padding: 50, bgColor: '#2563eb' },
+    { size: 180, name: 'apple-touch-icon.png', padding: 10, bgColor: '#000000' },
+    { size: 192, name: 'icon-192.png', padding: 10, bgColor: '#000000' },
+    { size: 512, name: 'icon-512.png', padding: 20, bgColor: '#000000' },
+    { size: 192, name: 'icon-192-maskable.png', padding: 20, bgColor: '#000000' },
+    { size: 512, name: 'icon-512-maskable.png', padding: 50, bgColor: '#000000' },
   ]
 
   for (const { size, name, padding, bgColor } of sizes) {
