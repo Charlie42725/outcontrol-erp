@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     // Create session
     await createSession(user.id)
 
-    // Return user data (without password hash)
-    return NextResponse.json({
+    // Return user data (without password hash) 並設置 no-cache header
+    const response = NextResponse.json({
       ok: true,
       data: {
         id: user.id,
@@ -62,6 +62,11 @@ export async function POST(request: NextRequest) {
         role: user.role,
       },
     })
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

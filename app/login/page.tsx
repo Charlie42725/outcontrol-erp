@@ -25,9 +25,8 @@ export default function LoginPage() {
       const data = await res.json()
 
       if (data.ok) {
-        // Redirect to home page
-        router.push('/')
-        router.refresh()
+        // 使用 window.location.href 強制完整刷新，清除所有前端狀態
+        window.location.href = '/'
       } else {
         setError(data.error || '登入失敗')
       }

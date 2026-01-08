@@ -6,16 +6,27 @@ export async function GET() {
     const user = await getSession()
 
     if (!user) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { ok: false, error: 'Not authenticated' },
         { status: 401 }
       )
+      // 確保未認證的狀態也不會被快取
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+      response.headers.set('Pragma', 'no-cache')
+      response.headers.set('Expires', '0')
+      return response
     }
 
-    return NextResponse.json({
+    // 返回用戶資料並設置 no-cache header，確保每次都獲取最新狀態
+    const response = NextResponse.json({
       ok: true,
       data: user,
     })
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+
+    return response
   } catch (error) {
     console.error('Get session error:', error)
     return NextResponse.json(

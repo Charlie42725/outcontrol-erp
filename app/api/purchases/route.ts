@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const vendorCode = searchParams.get('vendor_code')
     const keyword = searchParams.get('keyword')
     const productKeyword = searchParams.get('product_keyword')
+    const status = searchParams.get('status')
 
     let query = (supabaseServer
       .from('purchases') as any)
@@ -49,6 +50,10 @@ export async function GET(request: NextRequest) {
 
     if (keyword) {
       query = query.or(`purchase_no.ilike.%${keyword}%,vendor_code.ilike.%${keyword}%`)
+    }
+
+    if (status) {
+      query = query.eq('status', status)
     }
 
     const { data, error } = await query

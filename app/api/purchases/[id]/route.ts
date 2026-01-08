@@ -13,10 +13,30 @@ export async function GET(
   try {
     const { id } = await context.params
 
-    // Get purchase
+    // Get purchase with vendor and items
     const { data: purchase, error: purchaseError } = await (supabaseServer
       .from('purchases') as any)
-      .select('*')
+      .select(`
+        *,
+        vendors (
+          vendor_name
+        ),
+        purchase_items (
+          id,
+          product_id,
+          quantity,
+          cost,
+          subtotal,
+          products (
+            id,
+            item_code,
+            name,
+            unit,
+            cost,
+            stock
+          )
+        )
+      `)
       .eq('id', id)
       .single()
 
@@ -27,33 +47,9 @@ export async function GET(
       )
     }
 
-    // Get purchase items with product details
-    const { data: items, error: itemsError } = await (supabaseServer
-      .from('purchase_items') as any)
-      .select(`
-        *,
-        products:product_id (
-          id,
-          item_code,
-          name,
-          unit
-        )
-      `)
-      .eq('purchase_id', id)
-
-    if (itemsError) {
-      return NextResponse.json(
-        { ok: false, error: itemsError.message },
-        { status: 500 }
-      )
-    }
-
     return NextResponse.json({
       ok: true,
-      data: {
-        ...purchase,
-        items,
-      },
+      data: purchase,
     })
   } catch (error) {
     return NextResponse.json(

@@ -119,15 +119,23 @@ export function hasPermission(user: User | null, resource: string): boolean {
   const staffPermissions = [
     '/pos',
     '/expenses',
-    '/purchases',
+    '/purchases',           // View purchases list
+    '/purchases/staff',     // Staff quick purchase entry
     '/api/sales',
     '/api/expenses',
-    '/api/purchases',
-    '/api/products',
+    '/api/purchases',       // View purchases API
+    '/api/purchases/staff', // Staff submit purchase API
+    '/api/products',        // Search products
+    '/api/products/quick',  // Quick create product API
     '/api/customers',
     '/api/sale-drafts',
     '/api/ichiban-kuji',
   ]
 
   return staffPermissions.some(perm => resource.startsWith(perm))
+}
+
+// Helper to get current user (for use in API routes)
+export async function getCurrentUser(): Promise<User | null> {
+  return getSession()
 }

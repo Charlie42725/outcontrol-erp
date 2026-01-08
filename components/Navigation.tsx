@@ -56,8 +56,8 @@ export default function Navigation() {
     setLoggingOut(true)
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
-      router.push('/login')
-      router.refresh()
+      // 使用 window.location.href 強制完整刷新，清除所有前端狀態
+      window.location.href = '/login'
     } catch (err) {
       alert('登出失敗')
       setLoggingOut(false)
