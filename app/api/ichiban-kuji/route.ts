@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
             id,
             name,
             item_code,
+            barcode,
             cost,
+            price,
             unit
           )
         )

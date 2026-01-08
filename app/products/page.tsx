@@ -152,12 +152,20 @@ export default function ProductsPage() {
       <div className="mx-auto max-w-7xl">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">商品庫</h1>
-          <Link
-            href="/products/new"
-            className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            + 新增商品
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/barcode-print"
+              className="rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
+            >
+              打印條碼
+            </Link>
+            <Link
+              href="/products/new"
+              className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            >
+              + 新增商品
+            </Link>
+          </div>
         </div>
 
         {/* Filters */}
