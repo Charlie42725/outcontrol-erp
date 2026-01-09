@@ -9,31 +9,50 @@ import ThemeToggle from './ThemeToggle'
 type UserRole = 'admin' | 'staff'
 
 type NavItem = {
-  href: string
+  href?: string
   label: string
-  roles: UserRole[] // Which roles can access this page
+  roles: UserRole[]
+  submenu?: NavItem[]
 }
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: '營收報表', roles: ['admin'] },
   { href: '/pos', label: 'POS 收銀', roles: ['admin', 'staff'] },
-  //{ href: '/live-import', label: '直播訂單匯入', roles: ['admin', 'staff'] },
-  { href: '/products', label: '商品庫', roles: ['admin'] },
-  { href: '/ichiban-kuji', label: '一番賞庫', roles: ['admin'] },
-  { href: '/vendors', label: '廠商管理', roles: ['admin'] },
-  { href: '/customers', label: '客戶管理', roles: ['admin'] },
+  {
+    label: '庫存管理',
+    roles: ['admin'],
+    submenu: [
+      { href: '/products', label: '商品庫', roles: ['admin'] },
+      { href: '/ichiban-kuji', label: '一番賞庫', roles: ['admin'] },
+    ],
+  },
+  {
+    label: '往來對象',
+    roles: ['admin'],
+    submenu: [
+      { href: '/vendors', label: '廠商管理', roles: ['admin'] },
+      { href: '/customers', label: '客戶管理', roles: ['admin'] },
+    ],
+  },
   { href: '/purchases', label: '進貨管理', roles: ['admin', 'staff'] },
   { href: '/deliveries', label: '待出貨', roles: ['admin', 'staff'] },
   { href: '/sales', label: '銷售記錄', roles: ['admin'] },
-  { href: '/ar', label: '應收帳款', roles: ['admin'] },
-  { href: '/ap', label: '應付帳款', roles: ['admin'] },
-  { href: '/expenses', label: '會計記帳', roles: ['admin', 'staff'] },
+  {
+    label: '財務管理',
+    roles: ['admin', 'staff'],
+    submenu: [
+      { href: '/ar', label: '應收帳款', roles: ['admin'] },
+      { href: '/ap', label: '應付帳款', roles: ['admin'] },
+      { href: '/expenses', label: '會計記帳', roles: ['admin', 'staff'] },
+    ],
+  },
 ]
 
 export default function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
   const [user, setUser] = useState<{ username: string; role: UserRole } | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -70,10 +89,18 @@ export default function Navigation() {
     ? navItems.filter(item => item.roles.includes(user.role))
     : navItems
 
+  // Check if current path is in submenu
+  const isInSubmenu = (item: NavItem): boolean => {
+    if (item.submenu) {
+      return item.submenu.some(sub => sub.href === pathname)
+    }
+    return false
+  }
+
   return (
     <nav className="sticky top-0 z-50 border-b bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
       <div className="mx-auto max-w-full px-2 sm:px-4 lg:px-6">
-        <div className="flex h-16 items-center justify-between gap-2 sm:gap-4">
+        <div className="flex min-h-[4rem] items-center justify-between gap-2 sm:gap-4 py-2">
           <div className="flex items-center gap-3 sm:gap-6 lg:gap-8 min-w-0 flex-1">
             <Link href="/" className="flex items-center gap-2 shrink-0">
               <Image
@@ -86,20 +113,57 @@ export default function Navigation() {
               <span className="hidden sm:inline text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">失控 ERP</span>
             </Link>
 
-            {/* Desktop Navigation - 使用横向滚动 */}
-            <div className="hidden lg:flex gap-1 xl:gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500 pb-1">
+            {/* Desktop Navigation - 允许换行，不使用滚动 */}
+            <div className="hidden lg:flex gap-1 xl:gap-2 flex-wrap">
               {filteredNavItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`whitespace-nowrap rounded-lg px-2.5 xl:px-3 py-2 text-sm font-semibold transition-all duration-200 ${
-                    pathname === item.href
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
-                  }`}
-                >
-                  {item.label}
-                </Link>
+                item.submenu ? (
+                  // 下拉菜单
+                  <div key={item.label} className="relative group">
+                    <button
+                      className={`whitespace-nowrap rounded-lg px-2.5 xl:px-3 py-2 text-sm font-semibold transition-all duration-200 flex items-center gap-1 ${
+                        isInSubmenu(item)
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
+                      }`}
+                    >
+                      {item.label}
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {/* 下拉内容 - 使用 fixed 定位避免被裁切 */}
+                    <div className="absolute left-0 top-full mt-1 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100]">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1">
+                        {item.submenu.map((subItem) => (
+                          <Link
+                            key={subItem.href}
+                            href={subItem.href!}
+                            className={`block px-4 py-2 text-sm transition-colors ${
+                              pathname === subItem.href
+                                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 font-semibold'
+                                : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            {subItem.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // 普通链接
+                  <Link
+                    key={item.href}
+                    href={item.href!}
+                    className={`whitespace-nowrap rounded-lg px-2.5 xl:px-3 py-2 text-sm font-semibold transition-all duration-200 ${
+                      pathname === item.href
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-105'
+                        : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700 hover:shadow-sm'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                )
               ))}
             </div>
           </div>
@@ -187,18 +251,61 @@ export default function Navigation() {
 
             <div className="flex flex-col gap-1.5 px-3">
               {filteredNavItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 shadow-sm ${
-                    pathname === item.href
-                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-[1.02]'
-                      : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-650 border border-gray-200 dark:border-gray-600'
-                  }`}
-                >
-                  {item.label}
-                </Link>
+                item.submenu ? (
+                  // 移动端下拉菜单
+                  <div key={item.label}>
+                    <button
+                      onClick={() => setOpenSubmenu(openSubmenu === item.label ? null : item.label)}
+                      className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 shadow-sm flex items-center justify-between ${
+                        isInSubmenu(item)
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
+                          : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-650 border border-gray-200 dark:border-gray-600'
+                      }`}
+                    >
+                      {item.label}
+                      <svg 
+                        className={`w-4 h-4 transition-transform ${openSubmenu === item.label ? 'rotate-180' : ''}`}
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {openSubmenu === item.label && (
+                      <div className="mt-1.5 ml-4 flex flex-col gap-1.5">
+                        {item.submenu.map((subItem) => (
+                          <Link
+                            key={subItem.href}
+                            href={subItem.href!}
+                            onClick={() => setIsMenuOpen(false)}
+                            className={`rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 ${
+                              pathname === subItem.href
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
+                                : 'text-gray-600 bg-gray-50 hover:bg-gray-100 dark:text-gray-300 dark:bg-gray-750 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            {subItem.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // 普通链接
+                  <Link
+                    key={item.href}
+                    href={item.href!}
+                    onClick={() => setIsMenuOpen(false)}
+                    className={`rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 shadow-sm ${
+                      pathname === item.href
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md scale-[1.02]'
+                        : 'text-gray-700 bg-white hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-650 border border-gray-200 dark:border-gray-600'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                )
               ))}
             </div>
           </div>
