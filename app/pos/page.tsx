@@ -1190,7 +1190,7 @@ export default function POSPage() {
                               updateQuantity(item.product_id, newQty)
                             }
                           }}
-                          className="w-14 h-7 text-center font-bold text-sm text-black dark:text-gray-100 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded"
+                          className="w-14 h-7 text-center font-bold text-sm text-black dark:text-gray-100 bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 rounded focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                         <button
                           onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
