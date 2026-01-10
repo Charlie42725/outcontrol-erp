@@ -136,12 +136,24 @@ export async function POST(request: NextRequest) {
 
     const draft = validation.data
 
-    // Generate sale_no
-    const { count } = await supabaseServer
+    // Generate sale_no - 使用最新记录的编号来避免并发冲突
+    const { data: lastSale } = await supabaseServer
       .from('sales')
-      .select('*', { count: 'exact', head: true })
+      .select('sale_no')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
 
-    const saleNo = generateCode('S', count || 0)
+    let nextNumber = 1
+    if (lastSale?.sale_no) {
+      // Extract number from sale_no (e.g., "S0001" -> 1)
+      const match = lastSale.sale_no.match(/\d+/)
+      if (match) {
+        nextNumber = parseInt(match[0], 10) + 1
+      }
+    }
+
+    const saleNo = generateCode('S', nextNumber - 1)
 
     // Start transaction-like operations
     // 1. Create sale (draft)
