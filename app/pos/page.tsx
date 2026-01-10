@@ -66,6 +66,9 @@ export default function POSPage() {
   const [discountValue, setDiscountValue] = useState(0)
   const barcodeInputRef = useRef<HTMLInputElement>(null)
 
+  // Sales mode (店里 vs 直播)
+  const [salesMode, setSalesMode] = useState<'pos' | 'live'>('pos')
+
   // Custom scrollbar styles
   const scrollbarStyles = `
     .custom-scrollbar::-webkit-scrollbar {
@@ -214,7 +217,11 @@ export default function POSPage() {
     }
   }
 
-  const addToCart = (product: Product, quantity: number = 1, ichibanInfo?: { kuji_id: string; prize_id: string }) => {
+  const addToCart = (product: Product, quantityOrInfo: number | { kuji_id: string; prize_id: string } = 1) => {
+    // Determine if this is an ichiban kuji item
+    const ichibanInfo = typeof quantityOrInfo === 'object' ? quantityOrInfo : undefined
+    const quantity = typeof quantityOrInfo === 'number' ? quantityOrInfo : 1
+    
     setCart((prev) => {
       // For ichiban kuji, don't stack quantities
       if (ichibanInfo) {
@@ -310,13 +317,13 @@ export default function POSPage() {
   }
 
   const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
+    if (quantity < 1) {
       removeFromCart(productId)
       return
     }
     setCart((prev) =>
       prev.map((item) =>
-        item.product_id === productId ? { ...item, quantity } : item
+        item.product_id === productId && !item.ichiban_kuji_prize_id ? { ...item, quantity } : item
       )
     )
   }
@@ -759,6 +766,8 @@ export default function POSPage() {
           customer_name: data.data.customer_name,
           phone: data.data.phone,
           is_active: true,
+          store_credit: 0,
+          credit_limit: 0,
         }
 
         // Select the newly created customer
