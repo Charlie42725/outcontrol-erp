@@ -77,16 +77,14 @@ export async function POST(
 
     const deliveryNo = `D${String(nextNumber).padStart(4, '0')}`
 
-    // 4. 创建delivery记录
+    // 4. 创建delivery记录（直接设为confirmed状态）
     const { data: delivery, error: deliveryError } = await (supabaseServer
       .from('deliveries') as any)
       .insert({
         delivery_no: deliveryNo,
         sale_id: saleItem.sales.id,
-        customer_code: saleItem.sales.customer_code,
         delivery_date: new Date().toISOString().split('T')[0],
-        status: 'pending',
-        delivery_method: 'pickup',
+        status: 'confirmed',
         note: `單品出貨 - ${saleItem.snapshot_name}`
       })
       .select()
@@ -118,20 +116,7 @@ export async function POST(
       )
     }
 
-    // 6. 立即确认出货（扣库存）
-    const { error: confirmError } = await (supabaseServer
-      .from('deliveries') as any)
-      .update({ status: 'confirmed' })
-      .eq('id', delivery.id)
-
-    if (confirmError) {
-      return NextResponse.json(
-        { ok: false, error: '確認出貨失敗：' + confirmError.message },
-        { status: 500 }
-      )
-    }
-
-    // 7. 写入inventory_logs（扣库存）
+    // 6. 写入inventory_logs（扣库存）
     const { error: logError } = await (supabaseServer
       .from('inventory_logs') as any)
       .insert({
@@ -143,13 +128,15 @@ export async function POST(
       })
 
     if (logError) {
+      // 回滚：删除delivery和delivery_item
+      await (supabaseServer.from('deliveries') as any).delete().eq('id', delivery.id)
       return NextResponse.json(
         { ok: false, error: '扣除庫存失敗：' + logError.message },
         { status: 500 }
       )
     }
 
-    // 8. 更新sale的fulfillment_status
+    // 7. 更新sale的fulfillment_status
     // 检查该sale的所有sale_items是否都已出货
     const { data: allSaleItems } = await (supabaseServer
       .from('sale_items') as any)
