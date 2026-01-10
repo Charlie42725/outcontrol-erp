@@ -35,7 +35,6 @@ const navItems: NavItem[] = [
     ],
   },
   { href: '/purchases', label: '進貨管理', roles: ['admin', 'staff'] },
-  { href: '/deliveries', label: '待出貨', roles: ['admin', 'staff'] },
   { href: '/sales', label: '銷售記錄', roles: ['admin'] },
   {
     label: '財務管理',

@@ -298,9 +298,10 @@ export async function POST(request: NextRequest) {
       })
     )
 
-    const { error: itemsError } = await (supabaseServer
+    const { data: insertedSaleItems, error: itemsError } = await (supabaseServer
       .from('sale_items') as any)
       .insert(saleItems)
+      .select()
 
     if (itemsError) {
       // Rollback: delete the sale
@@ -452,11 +453,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 8. 創建出貨明細
-    const deliveryItems = draft.items.map((item) => ({
+    // 8. 創建出貨明細（关联到sale_items）
+    const deliveryItems = insertedSaleItems.map((saleItem: any, index: number) => ({
       delivery_id: delivery.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
+      sale_item_id: saleItem.id,
+      product_id: saleItem.product_id,
+      quantity: saleItem.quantity,
     }))
 
     const { error: deliveryItemsError } = await (supabaseServer
