@@ -69,6 +69,15 @@ export default function POSPage() {
   // Sales mode (店里 vs 直播)
   const [salesMode, setSalesMode] = useState<'pos' | 'live'>('pos')
 
+  // Pinned products (常用商品固定)
+  const [pinnedProductIds, setPinnedProductIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pinnedProducts')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    }
+    return new Set()
+  })
+
   // Custom scrollbar styles
   const scrollbarStyles = `
     .custom-scrollbar::-webkit-scrollbar {
@@ -798,11 +807,36 @@ export default function POSPage() {
     }
   }
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.item_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.barcode?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Toggle pin/unpin product
+  const togglePinProduct = (productId: string) => {
+    setPinnedProductIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(productId)) {
+        newSet.delete(productId)
+      } else {
+        newSet.add(productId)
+      }
+      // Save to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pinnedProducts', JSON.stringify(Array.from(newSet)))
+      }
+      return newSet
+    })
+  }
+
+  const filteredProducts = products
+    .filter(p =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.item_code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.barcode?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aIsPinned = pinnedProductIds.has(a.id)
+      const bIsPinned = pinnedProductIds.has(b.id)
+      if (aIsPinned && !bIsPinned) return -1
+      if (!aIsPinned && bIsPinned) return 1
+      return 0
+    })
 
   const filteredCustomers = customers.filter(c =>
     c.customer_name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
@@ -928,19 +962,19 @@ export default function POSPage() {
 
           {inventoryMode === 'products' && (
             <>
-              <div className="mb-2">
+              <div className="mb-2 space-y-1">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => {
                     const value = e.target.value
                     setSearchQuery(value)
-                    
+
                     // 清除上次的定时器
                     if (scanTimeoutRef.current) {
                       clearTimeout(scanTimeoutRef.current)
                     }
-                    
+
                     // 设置新的定时器，扫描枪通常在100ms内完成输入
                     scanTimeoutRef.current = setTimeout(() => {
                       if (value.trim()) {
@@ -948,7 +982,7 @@ export default function POSPage() {
                         const matchedProduct = products.find(
                           p => p.barcode && p.barcode.toLowerCase() === value.toLowerCase()
                         )
-                        
+
                         if (matchedProduct) {
                           // 自动添加到购物车
                           addToCart(matchedProduct, 1)
@@ -961,21 +995,41 @@ export default function POSPage() {
                   placeholder="掃描條碼或搜尋商品"
                   className="w-full border-2 border-gray-400 dark:border-gray-600 rounded px-3 py-2 text-sm text-black dark:text-gray-100 bg-white dark:bg-gray-700 focus:border-black dark:focus:border-blue-500 focus:outline-none"
                 />
+                <div className="text-xs text-gray-600 dark:text-gray-400 px-1">
+                  💡 左鍵加入購物車 · 右鍵固定常用商品
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-3 gap-2">
-                  {filteredProducts.map((product) => (
-                    <button
-                      key={product.id}
-                      onClick={() => addToCart(product, 1)}
-                      className="bg-blue-700 hover:bg-blue-800 text-white rounded p-3 shadow hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center min-h-[100px] border border-blue-800"
-                    >
-                      <div className="text-sm font-bold text-center mb-1 line-clamp-2">{product.name}</div>
-                      <div className="text-lg font-bold">{formatCurrency(product.price)}</div>
-                      <div className="text-xs mt-1">庫存: {product.stock}</div>
-                    </button>
-                  ))}
+                  {filteredProducts.map((product) => {
+                    const isPinned = pinnedProductIds.has(product.id)
+                    return (
+                      <button
+                        key={product.id}
+                        onClick={() => addToCart(product, 1)}
+                        onContextMenu={(e) => {
+                          e.preventDefault()
+                          togglePinProduct(product.id)
+                        }}
+                        className={`rounded p-3 shadow hover:shadow-md transition-all active:scale-95 flex flex-col items-center justify-center min-h-[100px] border relative ${
+                          isPinned
+                            ? 'bg-yellow-600 hover:bg-yellow-700 border-yellow-800'
+                            : 'bg-blue-700 hover:bg-blue-800 border-blue-800'
+                        } text-white`}
+                        title={isPinned ? '右鍵取消固定' : '右鍵固定到最上面'}
+                      >
+                        {isPinned && (
+                          <div className="absolute top-1 right-1 text-yellow-200">
+                            📌
+                          </div>
+                        )}
+                        <div className="text-sm font-bold text-center mb-1 line-clamp-2">{product.name}</div>
+                        <div className="text-lg font-bold">{formatCurrency(product.price)}</div>
+                        <div className="text-xs mt-1">庫存: {product.stock}</div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </>

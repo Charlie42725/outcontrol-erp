@@ -62,19 +62,32 @@ export async function POST(request: NextRequest) {
 
     // Generate customer_code if not provided
     if (!data.customer_code) {
-      const { count } = await supabaseServer
+      // Get the latest customer code to avoid duplicates
+      const { data: lastCustomerArray } = await supabaseServer
         .from('customers')
-        .select('*', { count: 'exact', head: true })
+        .select('customer_code')
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-      data.customer_code = generateCode('C', count || 0)
+      let nextNumber = 1
+      if (lastCustomerArray && lastCustomerArray.length > 0) {
+        const lastCustomer = lastCustomerArray[0] as { customer_code: string }
+        // Extract number from customer_code (e.g., "C0001" -> 1)
+        const match = lastCustomer.customer_code.match(/\d+/)
+        if (match) {
+          nextNumber = parseInt(match[0], 10) + 1
+        }
+      }
+
+      data.customer_code = generateCode('C', nextNumber - 1)
     }
 
-    // Check if customer_code already exists
+    // Check if customer_code already exists (in case of race condition)
     const { data: existing } = await supabaseServer
       .from('customers')
       .select('id')
       .eq('customer_code', data.customer_code)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json(
@@ -140,7 +153,7 @@ export async function PUT(request: NextRequest) {
         .select('id')
         .eq('customer_code', data.customer_code)
         .neq('id', id)
-        .single()
+        .maybeSingle()
 
       if (existing) {
         return NextResponse.json(

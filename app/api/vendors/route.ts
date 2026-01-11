@@ -62,19 +62,32 @@ export async function POST(request: NextRequest) {
 
     // Generate vendor_code if not provided
     if (!data.vendor_code) {
-      const { count } = await supabaseServer
+      // Get the latest vendor code to avoid duplicates
+      const { data: lastVendorArray } = await supabaseServer
         .from('vendors')
-        .select('*', { count: 'exact', head: true })
+        .select('vendor_code')
+        .order('created_at', { ascending: false })
+        .limit(1)
 
-      data.vendor_code = generateCode('V', count || 0)
+      let nextNumber = 1
+      if (lastVendorArray && lastVendorArray.length > 0) {
+        const lastVendor = lastVendorArray[0] as { vendor_code: string }
+        // Extract number from vendor_code (e.g., "V0001" -> 1)
+        const match = lastVendor.vendor_code.match(/\d+/)
+        if (match) {
+          nextNumber = parseInt(match[0], 10) + 1
+        }
+      }
+
+      data.vendor_code = generateCode('V', nextNumber - 1)
     }
 
-    // Check if vendor_code already exists
+    // Check if vendor_code already exists (in case of race condition)
     const { data: existing } = await supabaseServer
       .from('vendors')
       .select('id')
       .eq('vendor_code', data.vendor_code)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       return NextResponse.json(
