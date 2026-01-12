@@ -66,8 +66,8 @@ export default function POSPage() {
   const [discountValue, setDiscountValue] = useState(0)
   const barcodeInputRef = useRef<HTMLInputElement>(null)
 
-  // Sales mode - 固定為店裡模式
-  const salesMode = 'pos' as const
+  // Sales mode - 固定為直播模式
+  const salesMode = 'live' as const
 
   // Pinned products (常用商品固定)
   const [pinnedProductIds, setPinnedProductIds] = useState<Set<string>>(() => {
@@ -916,8 +916,8 @@ export default function POSPage() {
             : 'bg-white dark:bg-gray-800'
         }`}>
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold text-black dark:text-gray-100">
-            🏪 店裡收銀系統
+          <h1 className="text-2xl font-bold text-white">
+            📱 直播收銀系統
           </h1>
         </div>
         <div className="flex items-center gap-3">
