@@ -6,12 +6,13 @@ import { fromZodError } from 'zod-validation-error'
 // GET /api/accounts/[id] - 獲取單一帳戶
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const { data, error } = await (supabaseServer.from('accounts') as any)
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) {
@@ -33,9 +34,10 @@ export async function GET(
 // PATCH /api/accounts/[id] - 更新帳戶
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
 
     // 驗證輸入
@@ -55,7 +57,7 @@ export async function PATCH(
       const { data: existing } = await (supabaseServer.from('accounts') as any)
         .select('id')
         .eq('account_name', updates.account_name)
-        .neq('id', params.id)
+        .neq('id', id)
         .single()
 
       if (existing) {
@@ -69,7 +71,7 @@ export async function PATCH(
     // 更新帳戶
     const { data, error } = await (supabaseServer.from('accounts') as any)
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 
@@ -92,13 +94,14 @@ export async function PATCH(
 // DELETE /api/accounts/[id] - 刪除帳戶
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     // 檢查是否有相關的費用記錄
     const { data: expenseCount } = await (supabaseServer.from('expenses') as any)
       .select('id', { count: 'exact', head: true })
-      .eq('account_id', params.id)
+      .eq('account_id', id)
 
     if (expenseCount && (expenseCount as any).count > 0) {
       return NextResponse.json(
@@ -109,7 +112,7 @@ export async function DELETE(
 
     const { error } = await (supabaseServer.from('accounts') as any)
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (error) {
       return NextResponse.json(

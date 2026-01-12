@@ -153,49 +153,51 @@ export async function DELETE(
     // 1.5. Restore customer store_credit if used (check balance logs)
     if (sale.customer_code) {
       // 查找该销售单使用的购物金记录
-      const { data: balanceLog } = await (supabaseServer
+      const { data: balanceLogs } = await (supabaseServer
         .from('customer_balance_logs') as any)
         .select('amount, balance_before, balance_after')
         .eq('ref_type', 'sale')
-        .eq('ref_id', id)
+        .eq('ref_id', id.toString())
         .eq('customer_code', sale.customer_code)
-        .single()
 
       // 如果有使用购物金（amount 为负数），需要退回
-      if (balanceLog && balanceLog.amount < 0) {
-        const refundAmount = Math.abs(balanceLog.amount)
+      if (balanceLogs && balanceLogs.length > 0) {
+        const balanceLog = balanceLogs[0]
+        if (balanceLog.amount < 0) {
+          const refundAmount = Math.abs(balanceLog.amount)
 
-        // 获取客户当前购物金余额
-        const { data: customer } = await (supabaseServer
-          .from('customers') as any)
-          .select('store_credit')
-          .eq('customer_code', sale.customer_code)
-          .single()
-
-        if (customer) {
-          const newBalance = customer.store_credit + refundAmount
-
-          // 更新客户购物金余额
-          await (supabaseServer
+          // 获取客户当前购物金余额
+          const { data: customer } = await (supabaseServer
             .from('customers') as any)
-            .update({ store_credit: newBalance })
+            .select('store_credit')
             .eq('customer_code', sale.customer_code)
+            .single()
 
-          // 记录购物金退回日志
-          await (supabaseServer
-            .from('customer_balance_logs') as any)
-            .insert({
-              customer_code: sale.customer_code,
-              amount: refundAmount,
-              balance_before: customer.store_credit,
-              balance_after: newBalance,
-              type: 'refund',
-              ref_type: 'sale',
-              ref_id: id,
-              ref_no: sale.sale_no,
-              note: `删除销售单 ${sale.sale_no}，退回购物金`,
-              created_by: null,
-            })
+          if (customer) {
+            const newBalance = customer.store_credit + refundAmount
+
+            // 更新客户购物金余额
+            await (supabaseServer
+              .from('customers') as any)
+              .update({ store_credit: newBalance })
+              .eq('customer_code', sale.customer_code)
+
+            // 记录购物金退回日志
+            await (supabaseServer
+              .from('customer_balance_logs') as any)
+              .insert({
+                customer_code: sale.customer_code,
+                amount: refundAmount,
+                balance_before: customer.store_credit,
+                balance_after: newBalance,
+                type: 'refund',
+                ref_type: 'sale_delete',
+                ref_id: id.toString(),
+                ref_no: sale.sale_no,
+                note: `删除销售单 ${sale.sale_no}，退回购物金`,
+                created_by: null,
+              })
+          }
         }
       }
     }
@@ -215,7 +217,7 @@ export async function DELETE(
           .from('inventory_logs') as any)
           .select('product_id, qty_change')
           .eq('ref_type', 'delivery')
-          .eq('ref_id', delivery.id)
+          .eq('ref_id', delivery.id.toString())
 
         // 反向插入庫存日誌來回補庫存（trigger 會自動處理）
         for (const log of inventoryLogs || []) {
@@ -224,7 +226,7 @@ export async function DELETE(
             .insert({
               product_id: log.product_id,
               ref_type: 'sale_delete',
-              ref_id: id,
+              ref_id: id.toString(),
               qty_change: -log.qty_change, // 反向數量（原本是負數，現在變正數）
               memo: `刪除銷售單 ${sale.sale_no}，回補庫存（原出貨單：${delivery.delivery_no}）`,
             })
@@ -235,7 +237,7 @@ export async function DELETE(
           .from('inventory_logs') as any)
           .delete()
           .eq('ref_type', 'delivery')
-          .eq('ref_id', delivery.id)
+          .eq('ref_id', delivery.id.toString())
       }
 
       // 刪除出貨明細
@@ -300,30 +302,31 @@ export async function DELETE(
     }
 
     // 3. Delete account transaction and restore account balance
-    const { data: accountTransaction } = await (supabaseServer
+    const { data: accountTransactions } = await (supabaseServer
       .from('account_transactions') as any)
       .select('account_id, amount')
       .eq('ref_type', 'sale')
-      .eq('ref_id', id)
-      .single()
+      .eq('ref_id', id.toString())
 
-    if (accountTransaction) {
-      // 获取当前账户余额
-      const { data: account } = await (supabaseServer
-        .from('accounts') as any)
-        .select('balance')
-        .eq('id', accountTransaction.account_id)
-        .single()
-
-      if (account) {
-        // 减去这笔销售的金额（因为是收入，所以要减去）
-        const newBalance = account.balance - accountTransaction.amount
-
-        // 更新账户余额
-        await (supabaseServer
+    if (accountTransactions && accountTransactions.length > 0) {
+      for (const accountTransaction of accountTransactions) {
+        // 获取当前账户余额
+        const { data: account } = await (supabaseServer
           .from('accounts') as any)
-          .update({ balance: newBalance })
+          .select('balance')
           .eq('id', accountTransaction.account_id)
+          .single()
+
+        if (account) {
+          // 减去这笔销售的金额（因为是收入，所以要减去）
+          const newBalance = account.balance - accountTransaction.amount
+
+          // 更新账户余额
+          await (supabaseServer
+            .from('accounts') as any)
+            .update({ balance: newBalance })
+            .eq('id', accountTransaction.account_id)
+        }
       }
 
       // 删除账户交易记录
@@ -331,7 +334,7 @@ export async function DELETE(
         .from('account_transactions') as any)
         .delete()
         .eq('ref_type', 'sale')
-        .eq('ref_id', id)
+        .eq('ref_id', id.toString())
     }
 
     // 4. Delete related partner accounts (AR)
@@ -339,7 +342,7 @@ export async function DELETE(
       .from('partner_accounts') as any)
       .delete()
       .eq('ref_type', 'sale')
-      .eq('ref_id', id)
+      .eq('ref_id', id.toString())
 
     if (arDeleteError) {
       return NextResponse.json(

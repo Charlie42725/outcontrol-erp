@@ -171,24 +171,26 @@ export async function POST(request: NextRequest) {
 
     const draft = validation.data
 
-    // Generate sale_no - 使用最新记录的编号来避免并发冲突
-    const { data: lastSaleArray } = await supabaseServer
+    // Generate sale_no - 查找所有销售记录中的最大编号
+    const { data: allSales } = await supabaseServer
       .from('sales')
       .select('sale_no')
-      .order('created_at', { ascending: false })
-      .limit(1)
 
-    let nextNumber = 1
-    if (lastSaleArray && lastSaleArray.length > 0) {
-      const lastSale = lastSaleArray[0] as { sale_no: string }
-      // Extract number from sale_no (e.g., "S0001" -> 1)
-      const match = lastSale.sale_no.match(/\d+/)
-      if (match) {
-        nextNumber = parseInt(match[0], 10) + 1
-      }
+    let saleCount = 0
+    if (allSales && allSales.length > 0) {
+      // 從所有 sale_no 中找出最大的數字
+      const maxNumber = allSales.reduce((max: number, sale: any) => {
+        const match = sale.sale_no.match(/\d+/)
+        if (match) {
+          const num = parseInt(match[0], 10)
+          return num > max ? num : max
+        }
+        return max
+      }, 0)
+      saleCount = maxNumber
     }
 
-    const saleNo = generateCode('S', nextNumber - 1)
+    const saleNo = generateCode('S', saleCount)
 
     // Get account_id based on payment_method
     const { data: account } = await (supabaseServer
@@ -512,19 +514,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 7. 創建出貨單（使用當前最大編號 + 1 避免重複）
-    const { data: lastDeliveries } = await (supabaseServer
+    const { data: allDeliveries } = await (supabaseServer
       .from('deliveries') as any)
       .select('delivery_no')
-      .order('created_at', { ascending: false })
-      .limit(1)
 
     let deliveryCount = 0
-    if (lastDeliveries && lastDeliveries.length > 0) {
-      // 從 D0001 中提取數字部分
-      const match = lastDeliveries[0].delivery_no.match(/\d+/)
-      if (match) {
-        deliveryCount = parseInt(match[0], 10)
-      }
+    if (allDeliveries && allDeliveries.length > 0) {
+      // 從所有 delivery_no 中找出最大的數字
+      const maxNumber = allDeliveries.reduce((max: number, delivery: any) => {
+        const match = delivery.delivery_no.match(/\d+/)
+        if (match) {
+          const num = parseInt(match[0], 10)
+          return num > max ? num : max
+        }
+        return max
+      }, 0)
+      deliveryCount = maxNumber
     }
 
     const deliveryNo = generateCode('D', deliveryCount)
@@ -538,7 +543,6 @@ export async function POST(request: NextRequest) {
         delivery_date: is_delivered ? taiwanTime.toISOString() : null,
         method: delivery_method || null,
         note: delivery_note || null,
-        created_at: taiwanTime.toISOString(), // 使用台灣時間
       })
       .select()
       .single()
