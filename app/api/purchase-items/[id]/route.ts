@@ -84,22 +84,21 @@ export async function DELETE(
     }
 
     // 3. Update purchase total
-      const { data: remainingItems } = await (supabaseServer
-        .from('purchase_items') as any)
-        .select('quantity, cost')
-        .eq('purchase_id', item.purchase_id)
-        .neq('id', id)
+    const { data: remainingItems } = await (supabaseServer
+      .from('purchase_items') as any)
+      .select('quantity, cost')
+      .eq('purchase_id', item.purchase_id)
+      .neq('id', id)
 
-      const newTotal = (remainingItems || []).reduce(
-        (sum: number, i: any) => sum + (i.quantity * i.cost),
-        0
-      )
+    const newTotal = (remainingItems || []).reduce(
+      (sum: number, i: any) => sum + (i.quantity * i.cost),
+      0
+    )
 
-      await (supabaseServer
-        .from('purchases') as any)
-        .update({ total: newTotal })
-        .eq('id', item.purchase_id)
-    }
+    await (supabaseServer
+      .from('purchases') as any)
+      .update({ total: newTotal })
+      .eq('id', item.purchase_id)
 
     // 4. Delete related partner accounts (AP) for this item
     const { error: apDeleteError } = await (supabaseServer

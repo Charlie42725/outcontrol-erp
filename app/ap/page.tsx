@@ -314,15 +314,6 @@ export default function APPageV2() {
                   <div key={group.partner_code}>
                     {/* Vendor Header */}
                     <div className="flex items-center gap-4 p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={allSelected}
-                        onChange={(e) => selectAllForVendor(group.partner_code, e.target.checked)}
-                        disabled={unpaidAccounts.length === 0}
-                        className="h-4 w-4"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-
                       <div
                         className="flex-1 cursor-pointer dark:text-gray-100"
                         onClick={() => toggleVendor(group.partner_code)}
@@ -432,7 +423,7 @@ export default function APPageV2() {
                                   <td className="py-2 pr-4 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
                                     {formatCurrency(account.balance)}
                                   </td>
-                                  <td className={`py-2 pl-4 text-sm ${isOverdue ? 'font-semibold text-red-600' : 'text-gray-900'}`}>
+                                  <td className={`py-2 pl-4 text-sm ${isOverdue ? 'font-semibold text-red-400' : 'text-gray-100 dark:text-gray-100'}`}>
                                     {formatDate(account.due_date)}
                                     {isOverdue && ' (逾期)'}
                                   </td>
