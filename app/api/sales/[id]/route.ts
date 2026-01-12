@@ -86,12 +86,27 @@ export async function PATCH(
 
     const { payment_method } = validation.data
 
-    // Update sale payment method
+    // Get account_id based on payment_method
+    const { data: account } = await (supabaseServer
+      .from('accounts') as any)
+      .select('id')
+      .eq('payment_method_code', payment_method)
+      .eq('is_active', true)
+      .single()
+
+    const accountId = account?.id || null
+
+    // 取得台灣時間 (UTC+8)
+    const now = new Date()
+    const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+
+    // Update sale payment method and account_id
     const { data: sale, error } = await (supabaseServer
       .from('sales') as any)
       .update({
         payment_method,
-        updated_at: new Date().toISOString(),
+        account_id: accountId,
+        updated_at: taiwanTime.toISOString(),
       })
       .eq('id', id)
       .select()
@@ -121,10 +136,10 @@ export async function DELETE(
   try {
     const { id } = await context.params
 
-    // 1. Check if sale exists and get its status
+    // 1. Check if sale exists and get its info
     const { data: sale, error: fetchError } = await (supabaseServer
       .from('sales') as any)
-      .select('status')
+      .select('status, customer_code, sale_no')
       .eq('id', id)
       .single()
 
@@ -135,7 +150,108 @@ export async function DELETE(
       )
     }
 
-    // 2. If confirmed, need to restore ONLY ichiban kuji remaining (product stock auto-restored by DB trigger)
+    // 1.5. Restore customer store_credit if used (check balance logs)
+    if (sale.customer_code) {
+      // 查找该销售单使用的购物金记录
+      const { data: balanceLog } = await (supabaseServer
+        .from('customer_balance_logs') as any)
+        .select('amount, balance_before, balance_after')
+        .eq('ref_type', 'sale')
+        .eq('ref_id', id)
+        .eq('customer_code', sale.customer_code)
+        .single()
+
+      // 如果有使用购物金（amount 为负数），需要退回
+      if (balanceLog && balanceLog.amount < 0) {
+        const refundAmount = Math.abs(balanceLog.amount)
+
+        // 获取客户当前购物金余额
+        const { data: customer } = await (supabaseServer
+          .from('customers') as any)
+          .select('store_credit')
+          .eq('customer_code', sale.customer_code)
+          .single()
+
+        if (customer) {
+          const newBalance = customer.store_credit + refundAmount
+
+          // 更新客户购物金余额
+          await (supabaseServer
+            .from('customers') as any)
+            .update({ store_credit: newBalance })
+            .eq('customer_code', sale.customer_code)
+
+          // 记录购物金退回日志
+          await (supabaseServer
+            .from('customer_balance_logs') as any)
+            .insert({
+              customer_code: sale.customer_code,
+              amount: refundAmount,
+              balance_before: customer.store_credit,
+              balance_after: newBalance,
+              type: 'refund',
+              ref_type: 'sale',
+              ref_id: id,
+              ref_no: sale.sale_no,
+              note: `删除销售单 ${sale.sale_no}，退回购物金`,
+              created_by: null,
+            })
+        }
+      }
+    }
+
+    // 2. Get all deliveries for this sale
+    const { data: deliveries } = await (supabaseServer
+      .from('deliveries') as any)
+      .select('id, status, delivery_no')
+      .eq('sale_id', id)
+
+    // 3. For each delivery, restore inventory by inserting reverse logs
+    for (const delivery of deliveries || []) {
+      // 只有 confirmed 的 delivery 才有扣庫存，才需要回補
+      if (delivery.status === 'confirmed') {
+        // 獲取該出貨單的所有庫存扣除記錄
+        const { data: inventoryLogs } = await (supabaseServer
+          .from('inventory_logs') as any)
+          .select('product_id, qty_change')
+          .eq('ref_type', 'delivery')
+          .eq('ref_id', delivery.id)
+
+        // 反向插入庫存日誌來回補庫存（trigger 會自動處理）
+        for (const log of inventoryLogs || []) {
+          await (supabaseServer
+            .from('inventory_logs') as any)
+            .insert({
+              product_id: log.product_id,
+              ref_type: 'sale_delete',
+              ref_id: id,
+              qty_change: -log.qty_change, // 反向數量（原本是負數，現在變正數）
+              memo: `刪除銷售單 ${sale.sale_no}，回補庫存（原出貨單：${delivery.delivery_no}）`,
+            })
+        }
+
+        // 刪除原有的庫存日誌
+        await (supabaseServer
+          .from('inventory_logs') as any)
+          .delete()
+          .eq('ref_type', 'delivery')
+          .eq('ref_id', delivery.id)
+      }
+
+      // 刪除出貨明細
+      await (supabaseServer
+        .from('delivery_items') as any)
+        .delete()
+        .eq('delivery_id', delivery.id)
+
+      // 刪除出貨單
+      await (supabaseServer
+        .from('deliveries') as any)
+        .delete()
+        .eq('id', delivery.id)
+    }
+
+    // 4. If confirmed, need to restore ONLY ichiban kuji remaining
     if (sale.status === 'confirmed') {
       // Get all sale items (including ichiban kuji info)
       const { data: items, error: itemsError } = await (supabaseServer
@@ -150,7 +266,7 @@ export async function DELETE(
         )
       }
 
-      // Restore ONLY ichiban kuji remaining (product stock will be auto-restored by DB trigger)
+      // Restore ONLY ichiban kuji remaining
       for (const item of items || []) {
         // 如果是從一番賞售出的，恢復一番賞庫存
         if (item.ichiban_kuji_prize_id) {
@@ -181,7 +297,6 @@ export async function DELETE(
           }
         }
       }
-      // Product stock will be auto-restored by DB trigger when sale_items are deleted
     }
 
     // 3. Delete related partner accounts (AR)

@@ -45,6 +45,14 @@ const navItems: NavItem[] = [
       { href: '/expenses', label: '會計記帳', roles: ['admin', 'staff'] },
     ],
   },
+  {
+    label: '金流管理',
+    roles: ['admin'],
+    submenu: [
+      { href: '/accounts', label: '帳戶管理', roles: ['admin'] },
+      { href: '/finance', label: '財務總覽', roles: ['admin'] },
+    ],
+  },
 ]
 
 export default function Navigation() {

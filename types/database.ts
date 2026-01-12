@@ -164,6 +164,7 @@ export interface Database {
           sale_date: string
           source: string
           payment_method: string
+          account_id: string | null
           is_paid: boolean
           total: number
           status: string
@@ -179,6 +180,7 @@ export interface Database {
           sale_date?: string
           source?: string
           payment_method?: string
+          account_id?: string | null
           is_paid?: boolean
           total?: number
           status?: string
@@ -194,6 +196,7 @@ export interface Database {
           sale_date?: string
           source?: string
           payment_method?: string
+          account_id?: string | null
           is_paid?: boolean
           total?: number
           status?: string
@@ -379,6 +382,114 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+        }
+      }
+      accounts: {
+        Row: {
+          id: string
+          account_name: string
+          account_type: 'cash' | 'bank' | 'petty_cash'
+          payment_method_code: string | null
+          balance: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          account_name: string
+          account_type: 'cash' | 'bank' | 'petty_cash'
+          payment_method_code?: string | null
+          balance?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          account_name?: string
+          account_type?: 'cash' | 'bank' | 'petty_cash'
+          payment_method_code?: string | null
+          balance?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      expenses: {
+        Row: {
+          id: number
+          date: string
+          category: string
+          amount: number
+          account_id: string | null
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          date: string
+          category: string
+          amount: number
+          account_id?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          date?: string
+          category?: string
+          amount?: number
+          account_id?: string | null
+          note?: string | null
+          created_at?: string
+        }
+      }
+      business_day_closings: {
+        Row: {
+          id: string
+          source: 'pos' | 'live'
+          closing_time: string
+          sales_count: number
+          total_sales: number
+          total_cash: number
+          total_card: number
+          total_transfer: number
+          total_cod: number
+          sales_by_account: Json | null
+          note: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          source: 'pos' | 'live'
+          closing_time?: string
+          sales_count?: number
+          total_sales?: number
+          total_cash?: number
+          total_card?: number
+          total_transfer?: number
+          total_cod?: number
+          sales_by_account?: Json | null
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          source?: 'pos' | 'live'
+          closing_time?: string
+          sales_count?: number
+          total_sales?: number
+          total_cash?: number
+          total_card?: number
+          total_transfer?: number
+          total_cod?: number
+          sales_by_account?: Json | null
+          note?: string | null
+          created_by?: string | null
+          created_at?: string
         }
       }
     }

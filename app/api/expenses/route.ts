@@ -8,17 +8,30 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const category = searchParams.get('category')
+    const accountId = searchParams.get('account_id')
     const dateFrom = searchParams.get('date_from')
     const dateTo = searchParams.get('date_to')
 
     let query = (supabaseServer
       .from('expenses') as any)
-      .select('*')
+      .select(`
+        *,
+        accounts:account_id (
+          id,
+          account_name,
+          account_type,
+          balance
+        )
+      `)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
 
     if (category) {
       query = query.eq('category', category)
+    }
+
+    if (accountId) {
+      query = query.eq('account_id', accountId)
     }
 
     if (dateFrom) {
@@ -64,6 +77,10 @@ export async function POST(request: NextRequest) {
 
     const expense = validation.data
 
+    // 取得台灣時間 (UTC+8)
+    const now = new Date()
+    const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+
     // Insert expense
     const { data, error } = await (supabaseServer
       .from('expenses') as any)
@@ -71,7 +88,9 @@ export async function POST(request: NextRequest) {
         date: expense.date,
         category: expense.category,
         amount: expense.amount,
+        account_id: expense.account_id || null,
         note: expense.note || null,
+        created_at: taiwanTime.toISOString(), // 使用台灣時間
       })
       .select()
       .single()

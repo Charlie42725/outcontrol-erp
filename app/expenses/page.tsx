@@ -9,8 +9,20 @@ type Expense = {
   date: string
   category: string
   amount: number
+  account_id: string | null
   note: string | null
   created_at: string
+}
+
+type Account = {
+  id: string
+  account_name: string
+  account_type: string
+  balance: number
+}
+
+type ExpenseWithAccount = Expense & {
+  account?: Account
 }
 
 const EXPENSE_CATEGORIES = [
@@ -32,29 +44,53 @@ const EXPENSE_CATEGORIES = [
 
 export default function ExpensesPage() {
   const router = useRouter()
-  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [expenses, setExpenses] = useState<ExpenseWithAccount[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [accountFilter, setAccountFilter] = useState<string>('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [deleting, setDeleting] = useState<number | null>(null)
 
   useEffect(() => {
+    fetchAccounts()
+  }, [])
+
+  useEffect(() => {
     fetchExpenses()
-  }, [categoryFilter, dateFrom, dateTo])
+  }, [categoryFilter, accountFilter, dateFrom, dateTo])
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch('/api/accounts')
+      const data = await res.json()
+      if (data.ok) {
+        setAccounts(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch accounts:', err)
+    }
+  }
 
   const fetchExpenses = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (categoryFilter) params.append('category', categoryFilter)
+      if (accountFilter) params.append('account_id', accountFilter)
       if (dateFrom) params.append('date_from', dateFrom)
       if (dateTo) params.append('date_to', dateTo)
 
       const res = await fetch(`/api/expenses?${params}`)
       const data = await res.json()
       if (data.ok) {
-        setExpenses(data.data || [])
+        // API 已經包含關聯的帳戶資訊（accounts 欄位），重命名為 account
+        const expensesWithAccounts = (data.data || []).map((expense: any) => ({
+          ...expense,
+          account: expense.accounts, // Supabase 關聯查詢返回的欄位名
+        }))
+        setExpenses(expensesWithAccounts)
       }
     } catch (err) {
       console.error('Failed to fetch expenses:', err)
@@ -106,7 +142,7 @@ export default function ExpensesPage() {
 
         {/* Filters */}
         <div className="mb-4 rounded-lg bg-white dark:bg-gray-800 p-4 shadow">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                 費用類別
@@ -120,6 +156,23 @@ export default function ExpensesPage() {
                 {EXPENSE_CATEGORIES.map((cat) => (
                   <option key={cat} value={cat}>
                     {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                支出帳戶
+              </label>
+              <select
+                value={accountFilter}
+                onChange={(e) => setAccountFilter(e.target.value)}
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">全部帳戶</option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.account_name}
                   </option>
                 ))}
               </select>
@@ -151,11 +204,33 @@ export default function ExpensesPage() {
 
         {/* Summary */}
         <div className="mb-4 rounded-lg bg-white dark:bg-gray-800 p-4 shadow">
-          <div className="flex items-center justify-between">
-            <span className="text-lg font-medium text-gray-900 dark:text-gray-100">總支出</span>
-            <span className="text-2xl font-bold text-red-600">
-              {formatCurrency(totalAmount)}
-            </span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-medium text-gray-900 dark:text-gray-100">總支出</span>
+              <span className="text-2xl font-bold text-red-600">
+                {formatCurrency(totalAmount)}
+              </span>
+            </div>
+            {accountFilter && (
+              <div className="flex items-center justify-between text-sm border-t pt-2">
+                <span className="text-gray-600 dark:text-gray-400">
+                  {accounts.find((a) => a.id === accountFilter)?.account_name} 支出
+                </span>
+                <span className="font-semibold text-red-600">
+                  {formatCurrency(totalAmount)}
+                </span>
+              </div>
+            )}
+            {categoryFilter && (
+              <div className="flex items-center justify-between text-sm border-t pt-2">
+                <span className="text-gray-600 dark:text-gray-400">
+                  {categoryFilter} 支出
+                </span>
+                <span className="font-semibold text-red-600">
+                  {formatCurrency(totalAmount)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -184,6 +259,9 @@ export default function ExpensesPage() {
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
                       類別
                     </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      支出帳戶
+                    </th>
                     <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
                       金額
                     </th>
@@ -205,6 +283,15 @@ export default function ExpensesPage() {
                         <span className="inline-block rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
                           {expense.category}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        {expense.account ? (
+                          <span className="inline-block rounded bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
+                            {expense.account.account_name}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right text-sm font-semibold text-red-600">
                         {formatCurrency(expense.amount)}

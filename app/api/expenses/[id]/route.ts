@@ -58,6 +58,10 @@ export async function PUT(
 
     const expense = validation.data
 
+    // 取得台灣時間 (UTC+8)
+    const now = new Date()
+    const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+
     // Update expense
     const { data, error } = await (supabaseServer
       .from('expenses') as any)
@@ -65,7 +69,9 @@ export async function PUT(
         date: expense.date,
         category: expense.category,
         amount: expense.amount,
+        account_id: expense.account_id || null,
         note: expense.note || null,
+        updated_at: taiwanTime.toISOString(), // 使用台灣時間
       })
       .eq('id', id)
       .select()

@@ -140,12 +140,19 @@ export default function POSPage() {
   const [quantityInput, setQuantityInput] = useState('1')
   const quantityInputRef = useRef<HTMLInputElement>(null)
 
+  // Business day closing (日結)
+  const [lastClosingTime, setLastClosingTime] = useState<string>('')
+  const [closingStats, setClosingStats] = useState<any>(null)
+  const [showClosingModal, setShowClosingModal] = useState(false)
+  const [closingNote, setClosingNote] = useState('')
+  const [closingInProgress, setClosingInProgress] = useState(false)
+
   useEffect(() => {
     fetchCustomers()
     fetchProducts()
     fetchIchibanKujis()
     fetchDrafts()
-    fetchTodaySales()
+    fetchClosingStats() // 先獲取結帳統計，包含 lastClosingTime
   }, [])
 
   // Refetch today's sales when sales mode changes
@@ -218,16 +225,63 @@ export default function POSPage() {
     }
   }
 
-  const fetchTodaySales = async () => {
+  const fetchClosingStats = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const res = await fetch(`/api/sales?date_from=${today}&date_to=${today}&source=${salesMode}`)
+      const res = await fetch('/api/business-day-closing')
+      const data = await res.json()
+      if (data.ok) {
+        setLastClosingTime(data.data.last_closing_time)
+        setClosingStats(data.data.current_stats)
+        // 獲取結帳時間後，再獲取當日銷售
+        fetchTodaySales(data.data.last_closing_time)
+      }
+    } catch (err) {
+      console.error('Failed to fetch closing stats:', err)
+    }
+  }
+
+  const fetchTodaySales = async (closingTime?: string) => {
+    try {
+      const timeParam = closingTime || lastClosingTime
+      if (!timeParam) return
+
+      const res = await fetch(`/api/sales?created_from=${timeParam}&source=${salesMode}`)
       const data = await res.json()
       if (data.ok) {
         setTodaySales(data.data || [])
       }
     } catch (err) {
       console.error('Failed to fetch today sales:', err)
+    }
+  }
+
+  const handleClosing = async () => {
+    if (!confirm('確定要執行日結嗎？\n\n日結後將結算當日營業額，並開始新的營業日。')) {
+      return
+    }
+
+    setClosingInProgress(true)
+    try {
+      const res = await fetch('/api/business-day-closing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: closingNote }),
+      })
+
+      const data = await res.json()
+      if (data.ok) {
+        alert('日結完成！')
+        setShowClosingModal(false)
+        setClosingNote('')
+        // 重新獲取結帳統計
+        fetchClosingStats()
+      } else {
+        alert(`日結失敗：${data.error}`)
+      }
+    } catch (err) {
+      alert('日結失敗')
+    } finally {
+      setClosingInProgress(false)
     }
   }
 
@@ -923,7 +977,13 @@ export default function POSPage() {
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
           >
-            今日交易
+            當日交易
+          </button>
+          <button
+            onClick={() => setShowClosingModal(true)}
+            className="font-bold px-4 py-2 rounded-lg transition-all bg-green-600 hover:bg-green-700 text-white"
+          >
+            日結
           </button>
           <div className={`text-sm ${
             salesMode === 'live' ? 'text-white' : 'text-black dark:text-gray-300'
@@ -2031,6 +2091,104 @@ export default function POSPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Business Day Closing Modal (日結對話框) */}
+      {showClosingModal && closingStats && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4" onClick={() => setShowClosingModal(false)}>
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 rounded-t-lg">
+              <h2 className="text-2xl font-bold">營業日結算</h2>
+              <p className="text-sm opacity-90 mt-1">
+                結算時間：{new Date(lastClosingTime).toLocaleString('zh-TW')} ~ 現在
+              </p>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {/* 統計摘要 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                  <div className="text-sm font-medium text-blue-800 dark:text-blue-400 mb-1">
+                    銷售筆數
+                  </div>
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">
+                    {closingStats.sales_count} 筆
+                  </div>
+                </div>
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                  <div className="text-sm font-medium text-green-800 dark:text-green-400 mb-1">
+                    總營業額
+                  </div>
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-300">
+                    {formatCurrency(closingStats.total_sales)}
+                  </div>
+                </div>
+              </div>
+
+              {/* 收款明細 */}
+              <div className="border-t dark:border-gray-700 pt-4">
+                <h3 className="font-semibold text-lg mb-3 text-gray-900 dark:text-gray-100">收款明細</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-700 rounded px-4 py-2">
+                    <span className="text-gray-700 dark:text-gray-300">現金</span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(closingStats.total_cash)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-700 rounded px-4 py-2">
+                    <span className="text-gray-700 dark:text-gray-300">刷卡</span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(closingStats.total_card)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-700 rounded px-4 py-2">
+                    <span className="text-gray-700 dark:text-gray-300">轉帳</span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(closingStats.total_transfer)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-700 rounded px-4 py-2">
+                    <span className="text-gray-700 dark:text-gray-300">貨到付款</span>
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      {formatCurrency(closingStats.total_cod)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 備註 */}
+              <div className="border-t dark:border-gray-700 pt-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  備註（選填）
+                </label>
+                <textarea
+                  value={closingNote}
+                  onChange={(e) => setClosingNote(e.target.value)}
+                  placeholder="例如：早班、晚班、值班人員等..."
+                  className="w-full border dark:border-gray-600 rounded-lg px-4 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 focus:border-blue-500 focus:outline-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="border-t dark:border-gray-700 px-6 py-4 flex gap-3">
+              <button
+                onClick={handleClosing}
+                disabled={closingInProgress}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-3 rounded-lg transition-all"
+              >
+                {closingInProgress ? '結算中...' : '確認日結'}
+              </button>
+              <button
+                onClick={() => setShowClosingModal(false)}
+                disabled={closingInProgress}
+                className="flex-1 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 disabled:bg-gray-200 text-gray-900 dark:text-gray-100 font-bold py-3 rounded-lg transition-all"
+              >
+                取消
+              </button>
+            </div>
           </div>
         </div>
       )}

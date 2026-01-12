@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 
@@ -21,16 +21,46 @@ const EXPENSE_CATEGORIES = [
   '傭金支出',
 ]
 
+type Account = {
+  id: string
+  account_name: string
+  account_type: string
+  balance: number
+  is_active: boolean
+}
+
 export default function NewExpensePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     category: EXPENSE_CATEGORIES[0],
     amount: '',
+    account_id: '',
     note: '',
   })
+
+  useEffect(() => {
+    fetchAccounts()
+  }, [])
+
+  const fetchAccounts = async () => {
+    try {
+      const res = await fetch('/api/accounts?active_only=true')
+      const data = await res.json()
+      if (data.ok) {
+        setAccounts(data.data || [])
+        // 預設選擇第一個帳戶
+        if (data.data && data.data.length > 0) {
+          setFormData((prev) => ({ ...prev, account_id: data.data[0].id }))
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch accounts:', err)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,6 +142,33 @@ export default function NewExpensePage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Account */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">
+                支出帳戶 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.account_id}
+                onChange={(e) =>
+                  setFormData({ ...formData, account_id: e.target.value })
+                }
+                required
+                className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              >
+                <option value="">請選擇帳戶</option>
+                {accounts.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.account_name} ({formatCurrency(acc.balance)})
+                  </option>
+                ))}
+              </select>
+              {accounts.length === 0 && (
+                <p className="mt-1 text-sm text-red-500">
+                  請先建立帳戶
+                </p>
+              )}
             </div>
 
             {/* Amount */}

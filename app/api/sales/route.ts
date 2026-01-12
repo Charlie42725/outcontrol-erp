@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const dateFrom = searchParams.get('date_from')
     const dateTo = searchParams.get('date_to')
+    const createdFrom = searchParams.get('created_from') // 用於日結：從某時間點之後創建的訂單
     const customerCode = searchParams.get('customer_code')
     const source = searchParams.get('source')
     const keyword = searchParams.get('keyword')
@@ -43,6 +44,10 @@ export async function GET(request: NextRequest) {
 
     if (dateTo) {
       query = query.lte('sale_date', dateTo)
+    }
+
+    if (createdFrom) {
+      query = query.gte('created_at', createdFrom)
     }
 
     if (customerCode) {
@@ -185,6 +190,22 @@ export async function POST(request: NextRequest) {
 
     const saleNo = generateCode('S', nextNumber - 1)
 
+    // Get account_id based on payment_method
+    const { data: account } = await (supabaseServer
+      .from('accounts') as any)
+      .select('id')
+      .eq('payment_method_code', draft.payment_method)
+      .eq('is_active', true)
+      .single()
+
+    const accountId = account?.id || null
+
+    // 取得台灣時間 (UTC+8)
+    const now = new Date()
+    const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    const saleDate = taiwanTime.toISOString().split('T')[0] // YYYY-MM-DD
+    const createdAt = taiwanTime.toISOString() // 完整的台灣時間戳記
+
     // Start transaction-like operations
     // 1. Create sale (draft)
     const { data: sale, error: saleError } = await (supabaseServer
@@ -192,8 +213,10 @@ export async function POST(request: NextRequest) {
       .insert({
         sale_no: saleNo,
         customer_code: draft.customer_code || null,
+        sale_date: saleDate, // 設定台灣時間的日期
         source: draft.source,
         payment_method: draft.payment_method,
+        account_id: accountId,
         is_paid: draft.is_paid,
         note: draft.note || null,
         discount_type: draft.discount_type || 'none',
@@ -204,6 +227,7 @@ export async function POST(request: NextRequest) {
         delivery_method: delivery_method || null,
         expected_delivery_date: expected_delivery_date || null,
         delivery_note: delivery_note || null,
+        created_at: createdAt, // 手動設定為台灣時間
       })
       .select()
       .single()
@@ -437,6 +461,7 @@ export async function POST(request: NextRequest) {
         total: finalTotal,  // 使用抵扣购物金后的最终金额
         status: 'confirmed',
         fulfillment_status: is_delivered ? 'completed' : 'none',
+        updated_at: taiwanTime.toISOString(), // 使用台灣時間
       })
       .eq('id', sale.id)
       .select()
@@ -510,9 +535,10 @@ export async function POST(request: NextRequest) {
         delivery_no: deliveryNo,
         sale_id: sale.id,
         status: is_delivered ? 'confirmed' : 'draft',
-        delivery_date: is_delivered ? new Date().toISOString() : null,
+        delivery_date: is_delivered ? taiwanTime.toISOString() : null,
         method: delivery_method || null,
         note: delivery_note || null,
+        created_at: taiwanTime.toISOString(), // 使用台灣時間
       })
       .select()
       .single()

@@ -151,6 +151,16 @@ export const ichibanKujiDraftSchema = z.object({
   combo_prices: z.array(ichibanKujiComboPriceSchema).optional().default([]),
 })
 
+// Account schemas
+export const accountSchema = z.object({
+  account_name: z.string().min(1, 'Account name is required'),
+  account_type: z.enum(['cash', 'bank', 'petty_cash']),
+  balance: z.number().default(0),
+  is_active: z.boolean().default(true),
+})
+
+export const accountUpdateSchema = accountSchema.partial()
+
 // Expense schemas
 export const expenseSchema = z.object({
   date: z.string().min(1, 'Date is required'), // ISO date string
@@ -171,6 +181,7 @@ export const expenseSchema = z.object({
     '傭金支出',
   ]),
   amount: z.number().int().positive('Amount must be positive'),
+  account_id: z.string().uuid().optional().nullable(),
   note: z.string().optional(),
 })
 
