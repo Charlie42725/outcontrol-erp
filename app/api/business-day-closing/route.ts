@@ -47,21 +47,17 @@ export async function GET(request: NextRequest) {
       .limit(1)
       .single()
 
-    // 如果沒有結帳記錄，使用今天零點（台灣時區 UTC+8）
+    // 如果沒有結帳記錄，使用今天零點（UTC）
     let lastClosingTime = lastClosing?.closing_time
     if (!lastClosingTime) {
-      // 計算台灣時區的今天零點
+      // 取得今天的日期（UTC 零點）
       const now = new Date()
-      const taiwanNow = new Date(now.getTime() + 8 * 60 * 60 * 1000)
-      const taiwanToday = taiwanNow.toISOString().split('T')[0]
-      // 台灣今天零點 = UTC 前一天的 16:00
-      const utcMidnight = new Date(taiwanToday + 'T00:00:00+08:00')
-      lastClosingTime = utcMidnight.toISOString()
+      const todayUTC = now.toISOString().split('T')[0]
+      lastClosingTime = todayUTC + 'T00:00:00.000Z'
 
       console.log('[日結 GET] 時間計算:', {
         now: now.toISOString(),
-        taiwanNow: taiwanNow.toISOString(),
-        taiwanToday,
+        todayUTC,
         lastClosingTime
       })
     }
@@ -207,16 +203,13 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single()
 
-    // 如果沒有結帳記錄，使用今天零點（台灣時區 UTC+8）
+    // 如果沒有結帳記錄，使用今天零點（UTC）
     let lastClosingTime = lastClosing?.closing_time
     if (!lastClosingTime) {
-      // 計算台灣時區的今天零點
+      // 取得今天的日期（UTC 零點）
       const now = new Date()
-      const taiwanNow = new Date(now.getTime() + 8 * 60 * 60 * 1000)
-      const taiwanToday = taiwanNow.toISOString().split('T')[0]
-      // 台灣今天零點 = UTC 前一天的 16:00
-      const utcMidnight = new Date(taiwanToday + 'T00:00:00+08:00')
-      lastClosingTime = utcMidnight.toISOString()
+      const todayUTC = now.toISOString().split('T')[0]
+      lastClosingTime = todayUTC + 'T00:00:00.000Z'
     }
 
     // 2. 計算當日銷售統計（按來源篩選，包含未收款訂單）

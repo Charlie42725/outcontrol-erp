@@ -263,11 +263,16 @@ export default function POSPage() {
       }
 
       console.log('[fetchTodaySales] 查詢當日銷售，created_from:', timeParam, 'source:', salesMode)
-      const res = await fetch(`/api/sales?created_from=${timeParam}&source=${salesMode}`)
-      const data = await res.json()
-      console.log('[fetchTodaySales] 返回的銷售記錄:', data.data?.length, '筆')
 
-      if (data.ok) {
+      // 使用 encodeURIComponent 避免 + 符號被轉換為空格
+      const encodedTime = encodeURIComponent(timeParam)
+      const res = await fetch(`/api/sales?created_from=${encodedTime}&source=${salesMode}`)
+      const data = await res.json()
+
+      if (!data.ok) {
+        console.error('[fetchTodaySales] 查詢失敗:', data.error)
+      } else {
+        console.log('[fetchTodaySales] 返回的銷售記錄:', data.data?.length, '筆')
         setTodaySales(data.data || [])
       }
     } catch (err) {
@@ -2096,7 +2101,7 @@ export default function POSPage() {
             <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-4 rounded-t-lg">
               <h2 className="text-2xl font-bold">營業日結算</h2>
               <p className="text-sm opacity-90 mt-1">
-                結算時間：{new Date(lastClosingTime).toLocaleString('zh-TW')} ~ 現在
+                結算時間：{new Date(lastClosingTime).toLocaleString('zh-TW', { timeZone: 'UTC' })} ~ 現在
               </p>
             </div>
 
