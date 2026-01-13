@@ -434,7 +434,7 @@ export default function ARPageV2() {
               type="text"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="搜尋客戶名稱或代碼"
+              placeholder="搜尋客戶名稱、代碼或銷貨單號"
               className="flex-1 rounded border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 dark:bg-gray-700 placeholder:text-gray-900 dark:placeholder:text-gray-400"
             />
             <button

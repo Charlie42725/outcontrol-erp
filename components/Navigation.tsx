@@ -112,13 +112,13 @@ export default function Navigation() {
           <div className="flex items-center gap-3 sm:gap-6 lg:gap-8 min-w-0 flex-1">
             <Link href="/" className="flex items-center gap-2 shrink-0">
               <Image
-                src=""
+                src="/logo.jpg"
                 alt="ToyFlow ERP Logo"
                 width={40}
                 height={40}
                 className="rounded-lg shadow-sm sm:w-11 sm:h-11"
               />
-              <span className="hidden sm:inline text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">ERP</span>
+              <span className="hidden sm:inline text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-400 dark:to-blue-300 bg-clip-text text-transparent">失控 ERP</span>
             </Link>
 
             {/* Desktop Navigation - 允许换行，不使用滚动 */}

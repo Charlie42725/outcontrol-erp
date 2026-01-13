@@ -78,13 +78,29 @@ export async function PUT(
     const oldAmount = oldExpense.amount
     const newAmount = newExpense.amount
 
-    // 2. 刪除舊的 account_transactions 記錄
+    // 2. 完全還原舊狀態（如果有帳戶）
     if (oldAccountId) {
+      // 刪除舊的 account_transactions 記錄
       await (supabaseServer
         .from('account_transactions') as any)
         .delete()
         .eq('ref_type', 'expense')
         .eq('ref_id', id)
+
+      // 還原帳戶餘額
+      const { data: oldAccount } = await (supabaseServer
+        .from('accounts') as any)
+        .select('balance')
+        .eq('id', oldAccountId)
+        .single()
+
+      if (oldAccount) {
+        const restoredBalance = Number(oldAccount.balance) + oldAmount
+        await (supabaseServer
+          .from('accounts') as any)
+          .update({ balance: restoredBalance })
+          .eq('id', oldAccountId)
+      }
     }
 
     // 3. 更新 expense 記錄
@@ -108,87 +124,19 @@ export async function PUT(
       )
     }
 
-    // 4. 處理帳戶餘額更新
-    // 情況 1: 同一個帳戶，只調整差額
-    if (oldAccountId && newAccountId && oldAccountId === newAccountId) {
-      const amountDiff = newAmount - oldAmount // 金額差異
+    // 4. 重新記帳（先檢查是否已有記錄，防止重複）
+    if (newAccountId) {
+      // 檢查是否已經有新記錄（防止重複提交）
+      const { data: existingLog } = await (supabaseServer
+        .from('account_transactions') as any)
+        .select('id')
+        .eq('ref_type', 'expense')
+        .eq('ref_id', id)
+        .limit(1)
+        .maybeSingle()
 
-      if (amountDiff !== 0) {
-        // 讀取當前餘額
-        const { data: account } = await (supabaseServer
-          .from('accounts') as any)
-          .select('balance')
-          .eq('id', newAccountId)
-          .single()
-
-        if (account) {
-          // 只調整差額：正差額表示要多扣，負差額表示要退回
-          const newBalance = Number(account.balance) - amountDiff
-
-          await (supabaseServer
-            .from('accounts') as any)
-            .update({ balance: newBalance })
-            .eq('id', newAccountId)
-
-          // 建立新的 account_transactions 記錄
-          await (supabaseServer
-            .from('account_transactions') as any)
-            .insert({
-              account_id: newAccountId,
-              transaction_type: 'expense',
-              amount: newAmount,
-              balance_before: account.balance,
-              balance_after: newBalance,
-              ref_type: 'expense',
-              ref_id: id,
-              note: newExpense.note || null
-            })
-        }
-      } else {
-        // 金額沒變，只需重建 account_transactions 記錄
-        const { data: account } = await (supabaseServer
-          .from('accounts') as any)
-          .select('balance')
-          .eq('id', newAccountId)
-          .single()
-
-        if (account) {
-          await (supabaseServer
-            .from('account_transactions') as any)
-            .insert({
-              account_id: newAccountId,
-              transaction_type: 'expense',
-              amount: newAmount,
-              balance_before: account.balance,
-              balance_after: account.balance,
-              ref_type: 'expense',
-              ref_id: id,
-              note: newExpense.note || null
-            })
-        }
-      }
-    }
-    // 情況 2: 不同帳戶或從無到有/從有到無
-    else {
-      // 2.1 還原舊帳戶（如果有）
-      if (oldAccountId) {
-        const { data: oldAccount } = await (supabaseServer
-          .from('accounts') as any)
-          .select('balance')
-          .eq('id', oldAccountId)
-          .single()
-
-        if (oldAccount) {
-          const restoredBalance = Number(oldAccount.balance) + oldAmount
-          await (supabaseServer
-            .from('accounts') as any)
-            .update({ balance: restoredBalance })
-            .eq('id', oldAccountId)
-        }
-      }
-
-      // 2.2 從新帳戶扣款（如果有）
-      if (newAccountId) {
+      if (!existingLog) {
+        // 沒有記錄，才進行記帳
         const { data: newAccount } = await (supabaseServer
           .from('accounts') as any)
           .select('balance')
@@ -198,6 +146,7 @@ export async function PUT(
         if (newAccount) {
           const newBalance = Number(newAccount.balance) - newAmount
 
+          // 更新帳戶餘額
           await (supabaseServer
             .from('accounts') as any)
             .update({ balance: newBalance })
@@ -217,6 +166,8 @@ export async function PUT(
               note: newExpense.note || null
             })
         }
+      } else {
+        console.log(`[Expenses API] 費用 ${id} 已有交易記錄，跳過重複記帳`)
       }
     }
 

@@ -10,6 +10,28 @@ export async function GET(request: NextRequest) {
     const dueBefore = searchParams.get('due_before')
     const keyword = searchParams.get('keyword')
 
+    // 如果有 keyword，先搜尋銷貨單號和客戶名稱找出對應的 ID
+    let saleRefIds: string[] = []
+    let matchingCustomerCodes: string[] = []
+
+    if (keyword) {
+      // 搜尋銷貨單號
+      const { data: matchingSales } = await supabaseServer
+        .from('sales')
+        .select('id')
+        .ilike('sale_no', `%${keyword}%`)
+
+      saleRefIds = (matchingSales as any[])?.map(s => s.id) || []
+
+      // 搜尋客戶名稱
+      const { data: matchingCustomers } = await supabaseServer
+        .from('customers')
+        .select('customer_code')
+        .ilike('customer_name', `%${keyword}%`)
+
+      matchingCustomerCodes = (matchingCustomers as any[])?.map(c => c.customer_code) || []
+    }
+
     let query = supabaseServer
       .from('partner_accounts')
       .select('*')
@@ -30,7 +52,25 @@ export async function GET(request: NextRequest) {
     }
 
     if (keyword) {
-      query = query.ilike('partner_code', `%${keyword}%`)
+      // 搜尋：客戶代碼 OR 客戶名稱 OR 銷貨單號
+      const conditions: string[] = []
+
+      // 客戶代碼
+      conditions.push(`partner_code.ilike.%${keyword}%`)
+
+      // 客戶名稱（透過 customer_code）
+      if (matchingCustomerCodes.length > 0) {
+        conditions.push(`partner_code.in.(${matchingCustomerCodes.join(',')})`)
+      }
+
+      // 銷貨單號（透過 ref_id）
+      if (saleRefIds.length > 0) {
+        conditions.push(`ref_id.in.(${saleRefIds.join(',')})`)
+      }
+
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','))
+      }
     }
 
     const { data: accounts, error } = await query
