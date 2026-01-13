@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { settlementSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
+import { updateAccountBalance } from '@/lib/account-service'
 
 // POST /api/payments - Create payment (vendor payment)
 export async function POST(request: NextRequest) {
@@ -86,6 +87,37 @@ export async function POST(request: NextRequest) {
         { ok: false, error: settlementError.message },
         { status: 500 }
       )
+    }
+
+    // 更新帳戶餘額
+    const accountId = draft.account_id || null
+    const paymentMethod = draft.method || 'cash'
+
+    const accountUpdate = await updateAccountBalance({
+      supabase: supabaseServer,
+      accountId,
+      paymentMethod,
+      amount: draft.amount,
+      direction: 'decrease', // 付款 = 現金流出
+      transactionType: 'purchase_payment', // 付款給供應商
+      referenceId: settlement.id,
+      note: draft.note
+    })
+
+    if (!accountUpdate.success && !accountUpdate.warning) {
+      // 更新失敗，回滾 settlement
+      await (supabaseServer.from('settlements') as any).delete().eq('id', settlement.id)
+      return NextResponse.json(
+        { ok: false, error: `更新帳戶失敗: ${accountUpdate.error}` },
+        { status: 500 }
+      )
+    }
+
+    // 儲存 account_id 到 settlement（如果是自動解析的）
+    if (accountUpdate.accountId && !draft.account_id) {
+      await (supabaseServer.from('settlements') as any)
+        .update({ account_id: accountUpdate.accountId })
+        .eq('id', settlement.id)
     }
 
     // Create allocations (trigger will handle updating partner_accounts)

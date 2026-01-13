@@ -123,6 +123,7 @@ export const settlementSchema = z.object({
   ]).optional(),
   amount: z.number().positive('Amount must be positive'),
   note: z.string().optional(),
+  account_id: z.string().uuid().optional(),  // 新增：關聯的帳戶 ID（選用，可從 method 自動解析）
   allocations: z.array(
     z.object({
       partner_account_id: z.string().uuid(),

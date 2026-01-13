@@ -52,9 +52,13 @@ export default function NewExpensePage() {
       const data = await res.json()
       if (data.ok) {
         setAccounts(data.data || [])
-        // 預設選擇第一個帳戶
+        // 預設選擇"零用金"帳戶，找不到則選擇第一個帳戶
         if (data.data && data.data.length > 0) {
-          setFormData((prev) => ({ ...prev, account_id: data.data[0].id }))
+          const pettyAccount = data.data.find((acc: Account) =>
+            acc.account_name === '零用金' || acc.account_name.includes('零用金')
+          )
+          const defaultAccountId = pettyAccount?.id || data.data[0].id
+          setFormData((prev) => ({ ...prev, account_id: defaultAccountId }))
         }
       }
     } catch (err) {

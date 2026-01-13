@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { expenseSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
+import { updateAccountBalance } from '@/lib/account-service'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -56,22 +57,45 @@ export async function PUT(
       )
     }
 
-    const expense = validation.data
+    const newExpense = validation.data
 
-    // 取得台灣時間 (UTC+8)
-    const now = new Date()
-    const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+    // 1. 讀取舊的費用記錄
+    const { data: oldExpense, error: fetchError } = await (supabaseServer
+      .from('expenses') as any)
+      .select('account_id, amount')
+      .eq('id', id)
+      .single()
 
-    // Update expense
+    if (fetchError) {
+      return NextResponse.json(
+        { ok: false, error: 'Expense not found' },
+        { status: 404 }
+      )
+    }
+
+    const oldAccountId = oldExpense.account_id
+    const newAccountId = newExpense.account_id || null
+    const oldAmount = oldExpense.amount
+    const newAmount = newExpense.amount
+
+    // 2. 刪除舊的 account_transactions 記錄
+    if (oldAccountId) {
+      await (supabaseServer
+        .from('account_transactions') as any)
+        .delete()
+        .eq('ref_type', 'expense')
+        .eq('ref_id', id)
+    }
+
+    // 3. 更新 expense 記錄
     const { data, error } = await (supabaseServer
       .from('expenses') as any)
       .update({
-        date: expense.date,
-        category: expense.category,
-        amount: expense.amount,
-        account_id: expense.account_id || null,
-        note: expense.note || null,
-        updated_at: taiwanTime.toISOString(), // 使用台灣時間
+        date: newExpense.date,
+        category: newExpense.category,
+        amount: newExpense.amount,
+        account_id: newExpense.account_id || null,
+        note: newExpense.note || null,
       })
       .eq('id', id)
       .select()
@@ -82,6 +106,118 @@ export async function PUT(
         { ok: false, error: error.message },
         { status: 500 }
       )
+    }
+
+    // 4. 處理帳戶餘額更新
+    // 情況 1: 同一個帳戶，只調整差額
+    if (oldAccountId && newAccountId && oldAccountId === newAccountId) {
+      const amountDiff = newAmount - oldAmount // 金額差異
+
+      if (amountDiff !== 0) {
+        // 讀取當前餘額
+        const { data: account } = await (supabaseServer
+          .from('accounts') as any)
+          .select('balance')
+          .eq('id', newAccountId)
+          .single()
+
+        if (account) {
+          // 只調整差額：正差額表示要多扣，負差額表示要退回
+          const newBalance = Number(account.balance) - amountDiff
+
+          await (supabaseServer
+            .from('accounts') as any)
+            .update({ balance: newBalance })
+            .eq('id', newAccountId)
+
+          // 建立新的 account_transactions 記錄
+          await (supabaseServer
+            .from('account_transactions') as any)
+            .insert({
+              account_id: newAccountId,
+              transaction_type: 'expense',
+              amount: newAmount,
+              balance_before: account.balance,
+              balance_after: newBalance,
+              ref_type: 'expense',
+              ref_id: id,
+              note: newExpense.note || null
+            })
+        }
+      } else {
+        // 金額沒變，只需重建 account_transactions 記錄
+        const { data: account } = await (supabaseServer
+          .from('accounts') as any)
+          .select('balance')
+          .eq('id', newAccountId)
+          .single()
+
+        if (account) {
+          await (supabaseServer
+            .from('account_transactions') as any)
+            .insert({
+              account_id: newAccountId,
+              transaction_type: 'expense',
+              amount: newAmount,
+              balance_before: account.balance,
+              balance_after: account.balance,
+              ref_type: 'expense',
+              ref_id: id,
+              note: newExpense.note || null
+            })
+        }
+      }
+    }
+    // 情況 2: 不同帳戶或從無到有/從有到無
+    else {
+      // 2.1 還原舊帳戶（如果有）
+      if (oldAccountId) {
+        const { data: oldAccount } = await (supabaseServer
+          .from('accounts') as any)
+          .select('balance')
+          .eq('id', oldAccountId)
+          .single()
+
+        if (oldAccount) {
+          const restoredBalance = Number(oldAccount.balance) + oldAmount
+          await (supabaseServer
+            .from('accounts') as any)
+            .update({ balance: restoredBalance })
+            .eq('id', oldAccountId)
+        }
+      }
+
+      // 2.2 從新帳戶扣款（如果有）
+      if (newAccountId) {
+        const { data: newAccount } = await (supabaseServer
+          .from('accounts') as any)
+          .select('balance')
+          .eq('id', newAccountId)
+          .single()
+
+        if (newAccount) {
+          const newBalance = Number(newAccount.balance) - newAmount
+
+          await (supabaseServer
+            .from('accounts') as any)
+            .update({ balance: newBalance })
+            .eq('id', newAccountId)
+
+          // 建立新的 account_transactions 記錄
+          await (supabaseServer
+            .from('account_transactions') as any)
+            .insert({
+              account_id: newAccountId,
+              transaction_type: 'expense',
+              amount: newAmount,
+              balance_before: newAccount.balance,
+              balance_after: newBalance,
+              ref_type: 'expense',
+              ref_id: id,
+              note: newExpense.note || null
+            })
+        }
+      }
     }
 
     return NextResponse.json({ ok: true, data })
@@ -101,14 +237,59 @@ export async function DELETE(
   try {
     const { id } = await context.params
 
-    const { error } = await (supabaseServer
+    // 先讀取 expense 資料（用於還原帳戶餘額）
+    const { data: expense, error: fetchError } = await (supabaseServer
+      .from('expenses') as any)
+      .select('account_id, amount, note')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      return NextResponse.json(
+        { ok: false, error: 'Expense not found' },
+        { status: 404 }
+      )
+    }
+
+    // 如果有關聯帳戶，先還原餘額（在刪除 expense 之前）
+    if (expense.account_id) {
+      // 1. 刪除對應的 account_transactions 記錄
+      await (supabaseServer
+        .from('account_transactions') as any)
+        .delete()
+        .eq('ref_type', 'expense')
+        .eq('ref_id', id)
+
+      // 2. 直接反向更新帳戶餘額
+      const { data: account } = await (supabaseServer
+        .from('accounts') as any)
+        .select('balance')
+        .eq('id', expense.account_id)
+        .single()
+
+      if (account) {
+        const newBalance = Number(account.balance) + expense.amount // 還原餘額
+
+        const { error: updateError } = await (supabaseServer
+          .from('accounts') as any)
+          .update({ balance: newBalance })
+          .eq('id', expense.account_id)
+
+        if (updateError) {
+          console.error(`[Expenses API] 刪除費用 ${id} 後還原帳戶餘額失敗:`, updateError)
+        }
+      }
+    }
+
+    // 刪除 expense
+    const { error: deleteError } = await (supabaseServer
       .from('expenses') as any)
       .delete()
       .eq('id', id)
 
-    if (error) {
+    if (deleteError) {
       return NextResponse.json(
-        { ok: false, error: error.message },
+        { ok: false, error: deleteError.message },
         { status: 500 }
       )
     }

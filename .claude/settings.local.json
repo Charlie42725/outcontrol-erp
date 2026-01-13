@@ -22,7 +22,9 @@
       "Bash(mkdir:*)",
       "Bash(git -C /c/Users/linei/Desktop/coding/toyflow-erp log --oneline)",
       "Bash(wc:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(xargs ls:*)",
+      "Bash(git -C \"C:\\\\Users\\\\linei\\\\Desktop\\\\coding\\\\toyflow-erp\" log --oneline -15)"
     ]
   }
 }

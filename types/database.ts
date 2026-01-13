@@ -528,6 +528,85 @@ export interface Database {
           created_at?: string
         }
       }
+      settlements: {
+        Row: {
+          id: string
+          partner_type: 'customer' | 'vendor'
+          partner_code: string
+          trans_date: string
+          direction: 'payment' | 'receipt'
+          method: string
+          amount: number
+          note: string | null
+          account_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          partner_type: 'customer' | 'vendor'
+          partner_code: string
+          trans_date?: string
+          direction: 'payment' | 'receipt'
+          method?: string
+          amount: number
+          note?: string | null
+          account_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          partner_type?: 'customer' | 'vendor'
+          partner_code?: string
+          trans_date?: string
+          direction?: 'payment' | 'receipt'
+          method?: string
+          amount?: number
+          note?: string | null
+          account_id?: string | null
+          created_at?: string
+        }
+      }
+      account_transactions: {
+        Row: {
+          id: string
+          account_id: string
+          transaction_type: 'expense' | 'sale' | 'purchase_payment' | 'customer_payment' | 'adjustment'
+          amount: number
+          balance_before: number
+          balance_after: number
+          ref_type: string | null
+          ref_id: string | null
+          ref_no: string | null
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          account_id: string
+          transaction_type: 'expense' | 'sale' | 'purchase_payment' | 'customer_payment' | 'adjustment'
+          amount: number
+          balance_before: number
+          balance_after: number
+          ref_type?: string | null
+          ref_id?: string | null
+          ref_no?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          account_id?: string
+          transaction_type?: 'expense' | 'sale' | 'purchase_payment' | 'customer_payment' | 'adjustment'
+          amount?: number
+          balance_before?: number
+          balance_after?: number
+          ref_type?: string | null
+          ref_id?: string | null
+          ref_no?: string | null
+          note?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

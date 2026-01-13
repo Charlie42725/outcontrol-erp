@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { saleDraftSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
 import { generateCode } from '@/lib/utils'
+import { updateAccountBalance } from '@/lib/account-service'
 
 // GET /api/sales - List sales with items summary
 export async function GET(request: NextRequest) {
@@ -566,6 +567,27 @@ export async function POST(request: NextRequest) {
         { ok: false, error: confirmError.message },
         { status: 500 }
       )
+    }
+
+    // 6.5. 更新帳戶餘額（僅當已付款時）
+    if (draft.is_paid && accountId) {
+      const accountUpdate = await updateAccountBalance({
+        supabase: supabaseServer,
+        accountId,
+        paymentMethod: draft.payment_method,
+        amount: finalTotal, // 使用扣除購物金後的最終金額
+        direction: 'increase', // 銷售收款 = 現金流入
+        transactionType: 'sale',
+        referenceId: sale.id,
+        referenceNo: saleNo,
+        note: draft.note
+      })
+
+      if (!accountUpdate.success) {
+        console.error(`[Sales API] 銷售 ${saleNo} 更新帳戶餘額失敗:`, accountUpdate.error)
+        // 決策：僅記錄錯誤，不阻止銷售完成（可稍後手動調整）
+        // 銷售記錄比帳戶餘額更重要，避免中斷用戶交易流程
+      }
     }
 
     // 7. 創建出貨單（使用當前最大編號 + 1 避免重複）
