@@ -301,7 +301,8 @@ export async function DELETE(
       }
     }
 
-    // 3. Delete account transaction and restore account balance
+    // 3. 處理帳戶餘額還原
+    // 3.1 還原銷售時的收入（如果當時已付款）
     const { data: accountTransactions } = await (supabaseServer
       .from('account_transactions') as any)
       .select('account_id, amount')
@@ -310,7 +311,6 @@ export async function DELETE(
 
     if (accountTransactions && accountTransactions.length > 0) {
       for (const accountTransaction of accountTransactions) {
-        // 获取当前账户余额
         const { data: account } = await (supabaseServer
           .from('accounts') as any)
           .select('balance')
@@ -318,18 +318,19 @@ export async function DELETE(
           .single()
 
         if (account) {
-          // 减去这笔销售的金额（因为是收入，所以要减去）
+          // 減去這筆銷售的金額（因為是收入，所以要減去）
           const newBalance = account.balance - accountTransaction.amount
 
-          // 更新账户余额
           await (supabaseServer
             .from('accounts') as any)
             .update({ balance: newBalance })
             .eq('id', accountTransaction.account_id)
+
+          console.log(`[Delete Sale ${id}] Restored sale account ${accountTransaction.account_id}: -${accountTransaction.amount}`)
         }
       }
 
-      // 删除账户交易记录
+      // 刪除銷售的交易記錄
       await (supabaseServer
         .from('account_transactions') as any)
         .delete()
@@ -337,19 +338,82 @@ export async function DELETE(
         .eq('ref_id', id.toString())
     }
 
+    // 3.2 處理後續收款（receipts）的還原
+    // 查詢與此銷售單相關的 AR 記錄
+    const { data: arRecords } = await (supabaseServer
+      .from('partner_accounts') as any)
+      .select('id')
+      .eq('ref_type', 'sale')
+      .eq('ref_id', id.toString())
+
+    if (arRecords && arRecords.length > 0) {
+      const arIds = arRecords.map((ar: any) => ar.id)
+
+      // 查詢關聯的 settlement_allocations（收款分配）
+      const { data: allocations } = await (supabaseServer
+        .from('settlement_allocations') as any)
+        .select('settlement_id, amount')
+        .in('partner_account_id', arIds)
+
+      if (allocations && allocations.length > 0) {
+        // 找出所有關聯的 settlements（收款記錄）
+        const settlementIds = [...new Set(allocations.map((a: any) => a.settlement_id))]
+
+        for (const settlementId of settlementIds) {
+          // 查詢 settlement 資訊
+          const { data: settlement } = await (supabaseServer
+            .from('settlements') as any)
+            .select('amount, account_id')
+            .eq('id', settlementId)
+            .single()
+
+          if (settlement && settlement.account_id) {
+            // 刪除 account_transactions 記錄
+            await (supabaseServer
+              .from('account_transactions') as any)
+              .delete()
+              .eq('ref_type', 'settlement')
+              .eq('ref_id', settlementId)
+
+            // 還原帳戶餘額（減去收款金額）
+            const { data: account } = await (supabaseServer
+              .from('accounts') as any)
+              .select('balance')
+              .eq('id', settlement.account_id)
+              .single()
+
+            if (account) {
+              const newBalance = Number(account.balance) - settlement.amount
+              await (supabaseServer
+                .from('accounts') as any)
+                .update({ balance: newBalance })
+                .eq('id', settlement.account_id)
+
+              console.log(`[Delete Sale ${id}] Restored receipt account ${settlement.account_id}: -${settlement.amount}`)
+            }
+          }
+
+          // 刪除 settlement_allocations
+          await (supabaseServer
+            .from('settlement_allocations') as any)
+            .delete()
+            .eq('settlement_id', settlementId)
+
+          // 刪除 settlement
+          await (supabaseServer
+            .from('settlements') as any)
+            .delete()
+            .eq('id', settlementId)
+        }
+      }
+    }
+
     // 4. Delete related partner accounts (AR)
-    const { error: arDeleteError } = await (supabaseServer
+    await (supabaseServer
       .from('partner_accounts') as any)
       .delete()
       .eq('ref_type', 'sale')
       .eq('ref_id', id.toString())
-
-    if (arDeleteError) {
-      return NextResponse.json(
-        { ok: false, error: `Failed to delete AR: ${arDeleteError.message}` },
-        { status: 500 }
-      )
-    }
 
     // 5. Delete sale items
     await (supabaseServer.from('sale_items') as any).delete().eq('sale_id', id)

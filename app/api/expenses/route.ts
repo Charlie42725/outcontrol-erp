@@ -78,6 +78,10 @@ export async function POST(request: NextRequest) {
 
     const expense = validation.data
 
+    // 取得台灣時間 (UTC+8)
+    const now = new Date()
+    const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
+
     // Insert expense
     const { data, error } = await (supabaseServer
       .from('expenses') as any)
@@ -87,6 +91,7 @@ export async function POST(request: NextRequest) {
         amount: expense.amount,
         account_id: expense.account_id || null,
         note: expense.note || null,
+        created_at: taiwanTime.toISOString(),
       })
       .select()
       .single()

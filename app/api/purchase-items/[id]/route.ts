@@ -100,15 +100,120 @@ export async function DELETE(
       .update({ total: newTotal })
       .eq('id', item.purchase_id)
 
-    // 4. Delete related partner accounts (AP) for this item
-    const { error: apDeleteError } = await (supabaseServer
+    // 4. 回補已付款的帳戶餘額並刪除 AP 記錄
+    // 查詢 AP 記錄
+    const { data: apRecords } = await (supabaseServer
       .from('partner_accounts') as any)
-      .delete()
+      .select('id')
       .eq('purchase_item_id', id)
 
-    if (apDeleteError) {
-      console.error('Failed to delete AP record:', apDeleteError)
-      // Don't fail the whole operation, just log the error
+    if (apRecords && apRecords.length > 0) {
+      const apIds = apRecords.map((ap: any) => ap.id)
+
+      // 查詢關聯的 settlement_allocations
+      const { data: allocations } = await (supabaseServer
+        .from('settlement_allocations') as any)
+        .select('settlement_id, amount')
+        .in('partner_account_id', apIds)
+
+      if (allocations && allocations.length > 0) {
+        // 按 settlement 分組計算退款金額
+        const settlementAmounts = new Map<string, number>()
+        allocations.forEach((a: any) => {
+          const current = settlementAmounts.get(a.settlement_id) || 0
+          settlementAmounts.set(a.settlement_id, current + a.amount)
+        })
+
+        // 處理每個 settlement
+        for (const [settlementId, refundAmount] of settlementAmounts) {
+          // 查詢 settlement 資訊
+          const { data: settlement } = await (supabaseServer
+            .from('settlements') as any)
+            .select('amount, account_id')
+            .eq('id', settlementId)
+            .single()
+
+          if (settlement && settlement.account_id) {
+            // 回補帳戶餘額（部分退款）
+            const { data: account } = await (supabaseServer
+              .from('accounts') as any)
+              .select('balance')
+              .eq('id', settlement.account_id)
+              .single()
+
+            if (account) {
+              const newBalance = Number(account.balance) + refundAmount
+              await (supabaseServer
+                .from('accounts') as any)
+                .update({ balance: newBalance })
+                .eq('id', settlement.account_id)
+
+              console.log(`[Delete Purchase Item ${id}] Restored account ${settlement.account_id}: +${refundAmount}`)
+            }
+
+            // 刪除 account_transactions 中對應金額的記錄
+            // 注意：如果整個 settlement 只有這一項，才完全刪除 account_transactions
+            const { data: remainingAllocations } = await (supabaseServer
+              .from('settlement_allocations') as any)
+              .select('id')
+              .eq('settlement_id', settlementId)
+              .not('partner_account_id', 'in', `(${apIds.join(',')})`)
+
+            if (!remainingAllocations || remainingAllocations.length === 0) {
+              // 沒有其他細項，刪除整個 settlement 的交易記錄
+              await (supabaseServer
+                .from('account_transactions') as any)
+                .delete()
+                .eq('ref_type', 'settlement')
+                .eq('ref_id', settlementId)
+
+              // 刪除 settlement
+              await (supabaseServer
+                .from('settlements') as any)
+                .delete()
+                .eq('id', settlementId)
+            } else {
+              // 還有其他細項，更新 settlement 金額
+              const newSettlementAmount = settlement.amount - refundAmount
+              await (supabaseServer
+                .from('settlements') as any)
+                .update({ amount: newSettlementAmount })
+                .eq('id', settlementId)
+
+              // 更新 account_transactions 金額
+              const { data: txn } = await (supabaseServer
+                .from('account_transactions') as any)
+                .select('amount, balance_before, balance_after')
+                .eq('ref_type', 'settlement')
+                .eq('ref_id', settlementId)
+                .single()
+
+              if (txn) {
+                await (supabaseServer
+                  .from('account_transactions') as any)
+                  .update({
+                    amount: newSettlementAmount,
+                    balance_after: txn.balance_before - newSettlementAmount
+                  })
+                  .eq('ref_type', 'settlement')
+                  .eq('ref_id', settlementId)
+              }
+            }
+          }
+
+          // 刪除 settlement_allocations
+          await (supabaseServer
+            .from('settlement_allocations') as any)
+            .delete()
+            .in('partner_account_id', apIds)
+        }
+      }
+
+      // 刪除 AP 記錄
+      await (supabaseServer
+        .from('partner_accounts') as any)
+        .delete()
+        .in('id', apIds)
     }
 
     // 5. Delete purchase item

@@ -525,7 +525,10 @@ export default function ARPageV2() {
                 
                 // 計算已收/總額百分比
                 const totalAmount = group.accounts.reduce((sum, acc) => sum + acc.amount, 0)
-                const receivedAmount = group.accounts.reduce((sum, acc) => sum + acc.received_paid, 0)
+                // 修正：如果 status 為 paid，使用 amount 作為已收金額；否則使用 received_paid
+                const receivedAmount = group.accounts.reduce((sum, acc) => {
+                  return sum + (acc.status === 'paid' ? acc.amount : acc.received_paid)
+                }, 0)
                 const receivedPercentage = totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0
                 
                 // 找到最近到期日
