@@ -111,50 +111,40 @@ export async function GET(request: NextRequest) {
     if (productKeyword) {
       filteredData = data?.filter((sale: any) => {
         const items = sale.sale_items || []
-        return items.some((item: any) => 
+        return items.some((item: any) =>
           item.snapshot_name?.toLowerCase().includes(productKeyword.toLowerCase()) ||
           item.products?.item_code?.toLowerCase().includes(productKeyword.toLowerCase())
         )
       })
     }
 
-    // Get delivery status for all sale_items
+    // Get delivery status for all sale_items - 單次查詢取代分批迴圈
     const allSaleItemIds = filteredData?.flatMap((sale: any) =>
       sale.sale_items?.map((item: any) => item.id) || []
-    )
+    ) || []
 
     const deliveryQuantityMap: { [key: string]: number } = {}
 
-    if (allSaleItemIds && allSaleItemIds.length > 0) {
-      // 分批查詢，避免 URL 過長導致 HeadersOverflowError
-      const batchSize = 100
-      for (let i = 0; i < allSaleItemIds.length; i += batchSize) {
-        const batch = allSaleItemIds.slice(i, i + batchSize)
+    if (allSaleItemIds.length > 0) {
+      // 單次查詢所有 confirmed delivery_items，使用 RPC 或直接聚合
+      const { data: deliveryItems, error: deliveryError } = await (supabaseServer
+        .from('delivery_items') as any)
+        .select(`
+          sale_item_id,
+          quantity,
+          deliveries!inner (
+            status
+          )
+        `)
+        .in('sale_item_id', allSaleItemIds)
+        .eq('deliveries.status', 'confirmed')
 
-        const { data: deliveryItems, error: deliveryError } = await (supabaseServer
-          .from('delivery_items') as any)
-          .select(`
-            sale_item_id,
-            quantity,
-            deliveries!inner (
-              status
-            )
-          `)
-          .in('sale_item_id', batch)
-          .eq('deliveries.status', 'confirmed')
-
-        if (deliveryError) {
-          console.error('[Sales API] Delivery items query error:', deliveryError)
-          continue
-        }
-
-        deliveryItems?.forEach((di: any) => {
+      if (!deliveryError && deliveryItems) {
+        deliveryItems.forEach((di: any) => {
           const currentQty = deliveryQuantityMap[di.sale_item_id] || 0
           deliveryQuantityMap[di.sale_item_id] = currentQty + di.quantity
         })
       }
-
-      console.log('[Sales API] Delivery quantity map:', deliveryQuantityMap)
     }
 
     // Calculate summary for each sale and add delivery status to items
@@ -674,7 +664,7 @@ export async function POST(request: NextRequest) {
         console.log('=== 开始扣库存 ===')
         console.log('draft.items:', JSON.stringify(draft.items, null, 2))
         console.log('delivery.id:', delivery.id)
-        
+
         // 扣庫存：只寫入 inventory_logs，trigger 會自動更新 products.stock
         for (const item of draft.items) {
           console.log(`处理商品: ${item.product_id}, 数量: ${item.quantity}`)

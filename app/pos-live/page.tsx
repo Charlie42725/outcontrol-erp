@@ -196,12 +196,30 @@ export default function POSPage() {
     }
   }
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (forceRefresh = false) => {
     try {
+      // 快取機制：5 分鐘內使用 localStorage 快取
+      const CACHE_KEY = 'pos_products_cache'
+      const CACHE_EXPIRY_KEY = 'pos_products_cache_expiry'
+      const CACHE_DURATION = 5 * 60 * 1000 // 5 分鐘
+
+      if (!forceRefresh) {
+        const cached = localStorage.getItem(CACHE_KEY)
+        const expiry = localStorage.getItem(CACHE_EXPIRY_KEY)
+
+        if (cached && expiry && Date.now() < parseInt(expiry)) {
+          setProducts(JSON.parse(cached))
+          return
+        }
+      }
+
       const res = await fetch('/api/products?all=true&active=true')
       const data = await res.json()
       if (data.ok) {
         setProducts(data.data || [])
+        // 更新快取
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data.data || []))
+        localStorage.setItem(CACHE_EXPIRY_KEY, String(Date.now() + CACHE_DURATION))
       }
     } catch (err) {
       console.error('Failed to fetch products:', err)
