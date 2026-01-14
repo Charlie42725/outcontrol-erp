@@ -193,3 +193,21 @@ export const balanceAdjustmentSchema = z.object({
   type: z.enum(['recharge', 'deduct', 'adjustment']),
   note: z.string().optional(),
 })
+
+// Sale correction schemas
+export const saleCorrectionSchema = z.object({
+  items: z.array(z.object({
+    sale_item_id: z.string().uuid(),
+    new_quantity: z.number().int().min(0), // 0 = 刪除該品項
+    new_price: z.number().min(0).optional(),
+  })),
+  note: z.string().optional(),
+})
+
+// Sale to store credit schemas
+export const saleToStoreCreditSchema = z.object({
+  amount: z.number().positive().optional(), // 不指定則全額轉換
+  refund_inventory: z.boolean().default(true), // 是否回補庫存
+  note: z.string().optional(),
+})
+

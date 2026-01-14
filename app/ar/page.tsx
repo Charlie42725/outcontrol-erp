@@ -78,6 +78,12 @@ export default function ARPageV2() {
   const [saleNoInput, setSaleNoInput] = useState('')
   const [groupMode, setGroupMode] = useState<'customer' | 'sale'>('customer')
 
+  // 分頁狀態
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(100)
+  const [totalPages, setTotalPages] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
+
   // 工具函數：計算逾期天數
   const getDaysOverdue = (dueDate: string) => {
     const due = new Date(dueDate)
@@ -115,14 +121,21 @@ export default function ARPageV2() {
     return formatDate(dueDate)
   }
 
-  const fetchAccounts = async () => {
+  const fetchAccounts = async (page = currentPage) => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (keyword) params.set('keyword', keyword)
+      params.set('page', String(page))
+      params.set('pageSize', String(pageSize))
 
       const res = await fetch(`/api/ar?${params}`)
       const data = await res.json()
+
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages)
+        setTotalCount(data.pagination.total)
+      }
 
       if (data.ok) {
         if (groupMode === 'sale') {
@@ -843,6 +856,42 @@ export default function ARPageV2() {
             </div>
           )}
         </div>
+
+        {/* 分頁控制 */}
+        {!loading && totalPages > 1 && (
+          <div className="mt-4 rounded-lg bg-white dark:bg-gray-800 p-4 shadow flex items-center justify-between">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              共 {totalCount} 筆資料，第 {currentPage} / {totalPages} 頁
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const newPage = currentPage - 1
+                  setCurrentPage(newPage)
+                  fetchAccounts(newPage)
+                }}
+                disabled={currentPage === 1}
+                className="rounded px-3 py-1 text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                上一頁
+              </button>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => {
+                  const newPage = currentPage + 1
+                  setCurrentPage(newPage)
+                  fetchAccounts(newPage)
+                }}
+                disabled={currentPage === totalPages}
+                className="rounded px-3 py-1 text-sm font-medium bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                下一頁
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Receipt Modal */}

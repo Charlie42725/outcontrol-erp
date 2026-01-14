@@ -126,25 +126,36 @@ export async function GET(request: NextRequest) {
     const deliveryQuantityMap: { [key: string]: number } = {}
 
     if (allSaleItemIds.length > 0) {
-      // 單次查詢所有 confirmed delivery_items，使用 RPC 或直接聚合
-      const { data: deliveryItems, error: deliveryError } = await (supabaseServer
-        .from('delivery_items') as any)
-        .select(`
-          sale_item_id,
-          quantity,
-          deliveries!inner (
-            status
-          )
-        `)
-        .in('sale_item_id', allSaleItemIds)
-        .eq('deliveries.status', 'confirmed')
+      // 分批查詢避免 URL 過長（每批最多 50 個 ID）
+      const BATCH_SIZE = 50
+      const allDeliveryItems: any[] = []
 
-      if (!deliveryError && deliveryItems) {
-        deliveryItems.forEach((di: any) => {
-          const currentQty = deliveryQuantityMap[di.sale_item_id] || 0
-          deliveryQuantityMap[di.sale_item_id] = currentQty + di.quantity
-        })
+      for (let i = 0; i < allSaleItemIds.length; i += BATCH_SIZE) {
+        const batchIds = allSaleItemIds.slice(i, i + BATCH_SIZE)
+        const { data: batchItems, error: batchError } = await (supabaseServer
+          .from('delivery_items') as any)
+          .select(`
+            sale_item_id,
+            quantity,
+            deliveries!inner (
+              status
+            )
+          `)
+          .in('sale_item_id', batchIds)
+          .eq('deliveries.status', 'confirmed')
+
+        if (!batchError && batchItems) {
+          allDeliveryItems.push(...batchItems)
+        }
       }
+
+      // 計算每個 sale_item 已出貨的數量
+      allDeliveryItems.forEach((di: any) => {
+        const currentQty = deliveryQuantityMap[di.sale_item_id] || 0
+        deliveryQuantityMap[di.sale_item_id] = currentQty + di.quantity
+      })
+
+      console.log('[Sales API] deliveryQuantityMap entries:', Object.keys(deliveryQuantityMap).length)
     }
 
     // Calculate summary for each sale and add delivery status to items

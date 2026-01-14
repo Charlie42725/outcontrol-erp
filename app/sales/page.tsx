@@ -1,7 +1,69 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { formatCurrency, formatDate, formatDateTime, formatPaymentMethod } from '@/lib/utils'
+
+// Portal Dropdown 組件
+function PortalDropdown({
+  trigger,
+  children,
+  isOpen,
+  onClose
+}: {
+  trigger: React.ReactNode
+  children: React.ReactNode
+  isOpen: boolean
+  onClose: () => void
+}) {
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (isOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPosition({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.right + window.scrollX - 128, // 128 = w-32
+      })
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node)
+      ) {
+        onClose()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen, onClose])
+
+  return (
+    <>
+      <div ref={triggerRef}>{trigger}</div>
+      {isOpen && typeof window !== 'undefined' && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: 'absolute', top: position.top, left: position.left }}
+          className="w-32 rounded-lg bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 z-[9999]"
+        >
+          {children}
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
 
 type SaleItem = {
   id: string
@@ -80,6 +142,16 @@ export default function SalesPage() {
   const [selectedItemsDetails, setSelectedItemsDetails] = useState<SaleItem[]>([])
   const [itemQuantities, setItemQuantities] = useState<Map<string, number>>(new Map())
   const [showQuantityModal, setShowQuantityModal] = useState(false)
+
+  // 銷貨更正 & 轉購物金相關狀態
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false)
+  const [showStoreCreditModal, setShowStoreCreditModal] = useState(false)
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null)
+  const [correctionItems, setCorrectionItems] = useState<{ sale_item_id: string; new_quantity: number; new_price?: number }[]>([])
+  const [storeCreditAmount, setStoreCreditAmount] = useState<string>('')
+  const [correcting, setCorrecting] = useState(false)
+  const [convertingToStoreCredit, setConvertingToStoreCredit] = useState(false)
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
 
   const toggleCustomer = (customerKey: string) => {
     const newExpanded = new Set(expandedCustomers)
@@ -385,6 +457,126 @@ export default function SalesPage() {
     }
   }
 
+  // 開啟銷貨更正 Modal
+  const openCorrectionModal = (sale: Sale) => {
+    setSelectedSale(sale)
+    // 初始化每個品項的更正數量為原始數量
+    const items = sale.sale_items?.map(item => ({
+      sale_item_id: item.id,
+      new_quantity: item.quantity,
+      new_price: item.price,
+    })) || []
+    setCorrectionItems(items)
+    setShowCorrectionModal(true)
+  }
+
+  // 開啟轉購物金 Modal
+  const openStoreCreditModal = (sale: Sale) => {
+    setSelectedSale(sale)
+    setStoreCreditAmount(sale.total.toString())
+    setShowStoreCreditModal(true)
+  }
+
+  // 執行銷貨更正
+  const handleCorrection = async () => {
+    if (!selectedSale) return
+
+    // 檢查是否有變更
+    const hasChanges = correctionItems.some((item, index) => {
+      const original = selectedSale.sale_items?.[index]
+      return original && (item.new_quantity !== original.quantity || item.new_price !== original.price)
+    })
+
+    if (!hasChanges) {
+      alert('沒有任何變更')
+      return
+    }
+
+    if (!confirm('確定要執行銷貨更正嗎？此操作將會調整庫存和應收帳款。')) {
+      return
+    }
+
+    setCorrecting(true)
+    try {
+      const res = await fetch(`/api/sales/${selectedSale.id}/correction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: correctionItems,
+          note: '手動銷貨更正',
+        }),
+      })
+
+      const data = await res.json()
+
+      if (data.ok) {
+        alert(`銷貨更正成功！\n\n原金額：${formatCurrency(data.data.original_total)}\n更正後：${formatCurrency(data.data.corrected_total)}\n差額：${formatCurrency(data.data.adjustment_amount)}\n回補庫存：${data.data.inventory_restored} 件`)
+        setShowCorrectionModal(false)
+        setSelectedSale(null)
+        fetchSales()
+      } else {
+        alert(`更正失敗：${data.error}`)
+      }
+    } catch (err) {
+      alert('更正失敗')
+    } finally {
+      setCorrecting(false)
+    }
+  }
+
+  // 執行轉購物金
+  const handleToStoreCredit = async () => {
+    if (!selectedSale) return
+
+    const amount = parseFloat(storeCreditAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('請輸入有效的金額')
+      return
+    }
+
+    if (amount > selectedSale.total) {
+      alert(`金額不能超過銷售總額 ${formatCurrency(selectedSale.total)}`)
+      return
+    }
+
+    if (!selectedSale.customer_code) {
+      alert('此銷售單沒有關聯客戶，無法轉為購物金')
+      return
+    }
+
+    if (!confirm(`確定要將 ${formatCurrency(amount)} 轉為客戶購物金嗎？\n\n此操作將會回補庫存並清除應收帳款。`)) {
+      return
+    }
+
+    setConvertingToStoreCredit(true)
+    try {
+      const res = await fetch(`/api/sales/${selectedSale.id}/to-store-credit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: amount,
+          refund_inventory: true,
+          note: '銷貨轉購物金',
+        }),
+      })
+
+      const data = await res.json()
+
+      if (data.ok) {
+        alert(`轉購物金成功！\n\n客戶：${data.data.customer_name}\n轉換金額：${formatCurrency(data.data.conversion_amount)}\n購物金餘額：${formatCurrency(data.data.store_credit_before)} → ${formatCurrency(data.data.store_credit_after)}\n回補庫存：${data.data.inventory_restored} 件`)
+        setShowStoreCreditModal(false)
+        setSelectedSale(null)
+        fetchSales()
+      } else {
+        alert(`轉換失敗：${data.error}`)
+      }
+    } catch (err) {
+      alert('轉換失敗')
+    } finally {
+      setConvertingToStoreCredit(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
       <div className="mx-auto max-w-7xl">
@@ -449,8 +641,8 @@ export default function SalesPage() {
                     type="button"
                     onClick={() => setSourceFilter('all')}
                     className={`flex-1 rounded px-4 py-2 text-sm font-medium transition-colors ${sourceFilter === 'all'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                   >
                     全部
@@ -459,8 +651,8 @@ export default function SalesPage() {
                     type="button"
                     onClick={() => setSourceFilter('pos')}
                     className={`flex-1 rounded px-4 py-2 text-sm font-medium transition-colors ${sourceFilter === 'pos'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                   >
                     🏪 店裡
@@ -469,8 +661,8 @@ export default function SalesPage() {
                     type="button"
                     onClick={() => setSourceFilter('live')}
                     className={`flex-1 rounded px-4 py-2 text-sm font-medium transition-colors ${sourceFilter === 'live'
-                        ? 'bg-pink-600 text-white'
-                        : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      ? 'bg-pink-600 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                   >
                     📱 直播
@@ -543,7 +735,7 @@ export default function SalesPage() {
           </div>
         )}
 
-        <div className="rounded-lg bg-white dark:bg-gray-800 shadow">
+        <div className="rounded-lg bg-white dark:bg-gray-800 shadow overflow-visible">
           {loading ? (
             <div className="p-8 text-center text-gray-900 dark:text-gray-100">載入中...</div>
           ) : customerGroups.length === 0 || customerGroups[0]?.sales.length === 0 ? (
@@ -632,8 +824,8 @@ export default function SalesPage() {
                                   <td className="py-2 text-center text-sm">
                                     <span
                                       className={`inline-flex items-center gap-1 text-xs ${sale.is_paid
-                                          ? 'text-green-600 dark:text-green-400'
-                                          : 'text-gray-500 dark:text-gray-400'
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : 'text-gray-500 dark:text-gray-400'
                                         }`}
                                     >
                                       {sale.is_paid ? '✓ 已收' : '○ 未收'}
@@ -642,12 +834,12 @@ export default function SalesPage() {
                                   <td className="py-2 text-center text-sm">
                                     <span
                                       className={`inline-flex items-center gap-1 text-xs ${sale.fulfillment_status === 'completed'
-                                          ? 'text-blue-600 dark:text-blue-400'
-                                          : sale.fulfillment_status === 'partial'
-                                            ? 'text-amber-600 dark:text-amber-400'
-                                            : sale.fulfillment_status === 'none'
-                                              ? 'text-gray-500 dark:text-gray-400'
-                                              : 'text-gray-400'
+                                        ? 'text-blue-600 dark:text-blue-400'
+                                        : sale.fulfillment_status === 'partial'
+                                          ? 'text-amber-600 dark:text-amber-400'
+                                          : sale.fulfillment_status === 'none'
+                                            ? 'text-gray-500 dark:text-gray-400'
+                                            : 'text-gray-400'
                                         }`}
                                     >
                                       {sale.fulfillment_status === 'completed'
@@ -659,22 +851,56 @@ export default function SalesPage() {
                                             : '? 舊資料'}
                                     </span>
                                   </td>
-                                  <td className="py-2 text-center text-sm">
-                                    <div className="relative inline-block">
+                                  <td className="py-2 text-center text-sm" onClick={(e) => e.stopPropagation()}>
+                                    <PortalDropdown
+                                      isOpen={openDropdownId === sale.id}
+                                      onClose={() => setOpenDropdownId(null)}
+                                      trigger={
+                                        <button
+                                          onClick={() => setOpenDropdownId(openDropdownId === sale.id ? null : sale.id)}
+                                          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-lg font-bold"
+                                          title="更多操作"
+                                        >
+                                          ⋯
+                                        </button>
+                                      }
+                                    >
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation()
+                                          setOpenDropdownId(null)
+                                          openCorrectionModal(sale)
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
+                                      >
+                                        ✏️ 更正
+                                      </button>
+                                      {sale.customer_code && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setOpenDropdownId(null)
+                                            openStoreCreditModal(sale)
+                                          }}
+                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        >
+                                          💰 轉購物金
+                                        </button>
+                                      )}
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setOpenDropdownId(null)
                                           if (confirm(`確定要作廢銷售單 ${sale.sale_no} 嗎？\n\n此操作將會回補庫存，且無法復原。`)) {
                                             handleDelete(sale.id, sale.sale_no)
                                           }
                                         }}
                                         disabled={deleting === sale.id}
-                                        className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-lg font-bold disabled:opacity-50"
-                                        title="更多操作"
+                                        className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg disabled:opacity-50"
                                       >
-                                        {deleting === sale.id ? '...' : '⋯'}
+                                        {deleting === sale.id ? '處理中...' : '🗑️ 刪除'}
                                       </button>
-                                    </div>
+                                    </PortalDropdown>
                                   </td>
                                 </tr>
                                 {expandedSales.has(sale.id) && sale.sale_items && (
@@ -709,10 +935,10 @@ export default function SalesPage() {
                                                 <td className="py-1 text-right">
                                                   <span
                                                     className={`font-medium ${item.is_delivered
-                                                        ? 'text-green-600 dark:text-green-400'
-                                                        : deliveredQty > 0
-                                                          ? 'text-yellow-600 dark:text-yellow-400'
-                                                          : 'text-gray-600 dark:text-gray-400'
+                                                      ? 'text-green-600 dark:text-green-400'
+                                                      : deliveredQty > 0
+                                                        ? 'text-yellow-600 dark:text-yellow-400'
+                                                        : 'text-gray-600 dark:text-gray-400'
                                                       }`}
                                                   >
                                                     {deliveredQty} / {item.quantity}
@@ -813,8 +1039,8 @@ export default function SalesPage() {
                               {sale.customers?.customer_name || '散客'}
                             </td>
                             <td className={`px-6 py-4 text-right text-lg font-semibold ${sale.total > 0
-                                ? 'text-gray-900 dark:text-gray-100'
-                                : 'text-gray-400 dark:text-gray-500'
+                              ? 'text-gray-900 dark:text-gray-100'
+                              : 'text-gray-400 dark:text-gray-500'
                               }`}>
                               {formatCurrency(sale.total)}
                             </td>
@@ -828,8 +1054,8 @@ export default function SalesPage() {
                             <td className="px-6 py-4 text-center text-sm">
                               <span
                                 className={`inline-flex items-center gap-1 text-xs ${sale.is_paid
-                                    ? 'text-green-600 dark:text-green-400'
-                                    : 'text-gray-500 dark:text-gray-400'
+                                  ? 'text-green-600 dark:text-green-400'
+                                  : 'text-gray-500 dark:text-gray-400'
                                   }`}
                               >
                                 {sale.is_paid ? '✓ 已收' : '○ 未收'}
@@ -838,12 +1064,12 @@ export default function SalesPage() {
                             <td className="px-6 py-4 text-center text-sm">
                               <span
                                 className={`inline-flex items-center gap-1 text-xs ${sale.fulfillment_status === 'completed'
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : sale.fulfillment_status === 'partial'
-                                      ? 'text-amber-600 dark:text-amber-400'
-                                      : sale.fulfillment_status === 'none'
-                                        ? 'text-gray-500 dark:text-gray-400'
-                                        : 'text-gray-400'
+                                  ? 'text-blue-600 dark:text-blue-400'
+                                  : sale.fulfillment_status === 'partial'
+                                    ? 'text-amber-600 dark:text-amber-400'
+                                    : sale.fulfillment_status === 'none'
+                                      ? 'text-gray-500 dark:text-gray-400'
+                                      : 'text-gray-400'
                                   }`}
                               >
                                 {sale.fulfillment_status === 'completed'
@@ -856,18 +1082,52 @@ export default function SalesPage() {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-center text-sm" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => {
-                                  if (confirm(`確定要作廢銷售單 ${sale.sale_no} 嗎？\n\n此操作將會回補庫存，且無法復原。`)) {
-                                    handleDelete(sale.id, sale.sale_no)
-                                  }
-                                }}
-                                disabled={deleting === sale.id}
-                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-lg font-bold disabled:opacity-50"
-                                title="更多操作"
+                              <PortalDropdown
+                                isOpen={openDropdownId === sale.id}
+                                onClose={() => setOpenDropdownId(null)}
+                                trigger={
+                                  <button
+                                    onClick={() => setOpenDropdownId(openDropdownId === sale.id ? null : sale.id)}
+                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-lg font-bold"
+                                    title="更多操作"
+                                  >
+                                    ⋯
+                                  </button>
+                                }
                               >
-                                {deleting === sale.id ? '...' : '⋯'}
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    setOpenDropdownId(null)
+                                    openCorrectionModal(sale)
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
+                                >
+                                  ✏️ 更正
+                                </button>
+                                {sale.customer_code && (
+                                  <button
+                                    onClick={() => {
+                                      setOpenDropdownId(null)
+                                      openStoreCreditModal(sale)
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  >
+                                    💰 轉購物金
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setOpenDropdownId(null)
+                                    if (confirm(`確定要作廢銷售單 ${sale.sale_no} 嗎？\n\n此操作將會回補庫存，且無法復原。`)) {
+                                      handleDelete(sale.id, sale.sale_no)
+                                    }
+                                  }}
+                                  disabled={deleting === sale.id}
+                                  className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-b-lg disabled:opacity-50"
+                                >
+                                  {deleting === sale.id ? '處理中...' : '🗑️ 刪除'}
+                                </button>
+                              </PortalDropdown>
                             </td>
                           </tr>
                           {expandedSales.has(sale.id) && sale.sale_items && (
@@ -903,10 +1163,10 @@ export default function SalesPage() {
                                             <td className="py-2 text-right text-sm">
                                               <span
                                                 className={`font-medium ${item.is_delivered
-                                                    ? 'text-green-600 dark:text-green-400'
-                                                    : deliveredQty > 0
-                                                      ? 'text-yellow-600 dark:text-yellow-400'
-                                                      : 'text-gray-600 dark:text-gray-400'
+                                                  ? 'text-green-600 dark:text-green-400'
+                                                  : deliveredQty > 0
+                                                    ? 'text-yellow-600 dark:text-yellow-400'
+                                                    : 'text-gray-600 dark:text-gray-400'
                                                   }`}
                                               >
                                                 {deliveredQty} / {item.quantity}
@@ -979,8 +1239,8 @@ export default function SalesPage() {
                             key={page}
                             onClick={() => setCurrentPage(page)}
                             className={`min-w-[2.5rem] rounded px-3 py-2 text-sm font-medium ${currentPage === page
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                               }`}
                           >
                             {page}
@@ -1003,6 +1263,206 @@ export default function SalesPage() {
           )}
         </div>
       </div>
+
+      {/* 銷貨更正 Modal */}
+      {showCorrectionModal && selectedSale && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  ✏️ 銷貨更正 - {selectedSale.sale_no}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowCorrectionModal(false)
+                    setSelectedSale(null)
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>原始總額：</strong> {formatCurrency(selectedSale.total)}
+                </div>
+                <div className="text-xs text-blue-600 dark:text-blue-300 mt-1">
+                  修改數量後，系統將自動調整庫存與應收帳款
+                </div>
+              </div>
+
+              <table className="w-full mb-6">
+                <thead className="border-b">
+                  <tr>
+                    <th className="pb-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100">商品</th>
+                    <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">原數量</th>
+                    <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">新數量</th>
+                    <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">單價</th>
+                    <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">新小計</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {selectedSale.sale_items?.map((item, index) => {
+                    const correctionItem = correctionItems[index]
+                    const newSubtotal = (correctionItem?.new_quantity || 0) * (correctionItem?.new_price || item.price)
+                    return (
+                      <tr key={item.id}>
+                        <td className="py-2 text-sm text-gray-900 dark:text-gray-100">
+                          <div>{item.snapshot_name}</div>
+                          <div className="text-xs text-gray-500">{item.products.item_code}</div>
+                        </td>
+                        <td className="py-2 text-right text-sm text-gray-500">{item.quantity}</td>
+                        <td className="py-2 text-right">
+                          <input
+                            type="number"
+                            min="0"
+                            value={correctionItem?.new_quantity ?? item.quantity}
+                            onChange={(e) => {
+                              const newItems = [...correctionItems]
+                              newItems[index] = {
+                                ...newItems[index],
+                                new_quantity: parseInt(e.target.value) || 0,
+                              }
+                              setCorrectionItems(newItems)
+                            }}
+                            className="w-20 px-2 py-1 text-right rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                          />
+                        </td>
+                        <td className="py-2 text-right text-sm text-gray-900 dark:text-gray-100">
+                          {formatCurrency(correctionItem?.new_price || item.price)}
+                        </td>
+                        <td className="py-2 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
+                          {formatCurrency(newSubtotal)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot className="border-t">
+                  <tr>
+                    <td colSpan={4} className="py-2 text-right font-semibold text-gray-900 dark:text-gray-100">
+                      更正後總額：
+                    </td>
+                    <td className="py-2 text-right text-lg font-bold text-green-600 dark:text-green-400">
+                      {formatCurrency(
+                        correctionItems.reduce((sum, item, index) => {
+                          const originalItem = selectedSale.sale_items?.[index]
+                          return sum + (item.new_quantity * (item.new_price || originalItem?.price || 0))
+                        }, 0)
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    setShowCorrectionModal(false)
+                    setSelectedSale(null)
+                  }}
+                  className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleCorrection}
+                  disabled={correcting}
+                  className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400"
+                >
+                  {correcting ? '處理中...' : '確認更正'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 轉購物金 Modal */}
+      {showStoreCreditModal && selectedSale && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                  💰 轉購物金 - {selectedSale.sale_no}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowStoreCreditModal(false)
+                    setSelectedSale(null)
+                  }}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                <div className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>客戶：</strong> {selectedSale.customers?.customer_name || selectedSale.customer_code}
+                </div>
+                <div className="text-sm text-amber-800 dark:text-amber-200 mt-1">
+                  <strong>銷售總額：</strong> {formatCurrency(selectedSale.total)}
+                </div>
+                <div className="text-xs text-amber-600 dark:text-amber-300 mt-2">
+                  將銷售金額轉為客戶購物金，庫存將回補
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                  轉換金額
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={selectedSale.total}
+                  value={storeCreditAmount}
+                  onChange={(e) => setStoreCreditAmount(e.target.value)}
+                  className="w-full px-4 py-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => setStoreCreditAmount(selectedSale.total.toString())}
+                    className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  >
+                    全額轉換
+                  </button>
+                  <button
+                    onClick={() => setStoreCreditAmount((selectedSale.total / 2).toString())}
+                    className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  >
+                    半額
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    setShowStoreCreditModal(false)
+                    setSelectedSale(null)
+                  }}
+                  className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleToStoreCredit}
+                  disabled={convertingToStoreCredit}
+                  className="px-4 py-2 rounded bg-amber-600 text-white hover:bg-amber-700 disabled:bg-gray-400"
+                >
+                  {convertingToStoreCredit ? '處理中...' : '確認轉換'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
