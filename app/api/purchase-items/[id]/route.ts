@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { getTaiwanTime } from '@/lib/timezone'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -142,10 +143,14 @@ export async function DELETE(
               .single()
 
             if (account) {
+              // 直接更新餘額（因為是退款操作，不需要創建新交易記錄）
               const newBalance = Number(account.balance) + refundAmount
               await (supabaseServer
                 .from('accounts') as any)
-                .update({ balance: newBalance })
+                .update({
+                  balance: newBalance,
+                  updated_at: getTaiwanTime()
+                })
                 .eq('id', settlement.account_id)
 
               console.log(`[Delete Purchase Item ${id}] Restored account ${settlement.account_id}: +${refundAmount}`)
@@ -189,14 +194,23 @@ export async function DELETE(
                 .single()
 
               if (txn) {
-                await (supabaseServer
-                  .from('account_transactions') as any)
-                  .update({
-                    amount: newSettlementAmount,
-                    balance_after: txn.balance_before - newSettlementAmount
-                  })
-                  .eq('ref_type', 'settlement')
-                  .eq('ref_id', settlementId)
+                // 正確的 balance_after 應該基於當前帳戶餘額
+                const { data: currentAccount } = await (supabaseServer
+                  .from('accounts') as any)
+                  .select('balance')
+                  .eq('id', settlement.account_id)
+                  .single()
+
+                if (currentAccount) {
+                  await (supabaseServer
+                    .from('account_transactions') as any)
+                    .update({
+                      amount: newSettlementAmount,
+                      balance_after: currentAccount.balance
+                    })
+                    .eq('ref_type', 'settlement')
+                    .eq('ref_id', settlementId)
+                }
               }
             }
           }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { getTaiwanTime } from '@/lib/timezone'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -168,12 +169,12 @@ export async function PATCH(
         })
     }
 
-    // 更新出貨單狀態
+    // 更新出貨單狀態（使用台灣時間）
     const { data: confirmedDelivery, error: updateError } = await (supabaseServer
       .from('deliveries') as any)
       .update({
         status: 'confirmed',
-        delivery_date: new Date().toISOString(),
+        delivery_date: getTaiwanTime(),
       })
       .eq('id', id)
       .select()
@@ -261,11 +262,30 @@ export async function DELETE(
           .eq('ref_id', id)
       }
 
-      // 更新 sales 的履約狀態
-      await (supabaseServer
-        .from('sales') as any)
-        .update({ fulfillment_status: 'none' })
-        .eq('id', delivery.sale_id)
+      // 更新 sales 的履約狀態（檢查是否還有其他已確認的出貨單）
+      const { data: otherDeliveries } = await (supabaseServer
+        .from('deliveries') as any)
+        .select('id, status')
+        .eq('sale_id', delivery.sale_id)
+        .neq('id', id) // 排除當前正在刪除的出貨單
+
+      const hasOtherConfirmedDeliveries = otherDeliveries?.some(
+        (d: any) => d.status === 'confirmed'
+      )
+
+      // 如果還有其他已確認的出貨單，保持 fulfillment_status 不變
+      // 否則設定為 'none'（因為沒有任何已確認的出貨）
+      if (!hasOtherConfirmedDeliveries) {
+        await (supabaseServer
+          .from('sales') as any)
+          .update({ fulfillment_status: 'none' })
+          .eq('id', delivery.sale_id)
+      } else {
+        // 還有其他已確認的出貨單，需要重新計算 fulfillment_status
+        // 這裡可以添加更精確的計算邏輯（partial vs completed）
+        // 暫時保持原狀態不變
+        console.log(`[Delete Delivery ${id}] Sale ${delivery.sale_id} still has other confirmed deliveries`)
+      }
     }
 
     // 刪除出貨明細（cascade）

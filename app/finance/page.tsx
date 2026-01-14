@@ -281,7 +281,7 @@ export default function FinanceDashboardPage() {
           {closingStats && (
             <div className="mb-4 space-y-3">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                上次結帳時間：{new Date(closingStats.last_closing_time).toLocaleString('zh-TW')}
+                上次結帳時間：{new Date(closingStats.last_closing_time).toLocaleString('zh-TW', { timeZone: 'UTC' })}
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">

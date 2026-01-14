@@ -4,6 +4,7 @@ import { saleDraftSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
 import { generateCode } from '@/lib/utils'
 import { updateAccountBalance } from '@/lib/account-service'
+import { getTaiwanTime } from '@/lib/timezone'
 
 // GET /api/sales - List sales with items summary
 export async function GET(request: NextRequest) {
@@ -257,8 +258,10 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (lastClosing?.closing_time) {
-      // 使用上次日結時間的日期作為營業日
-      saleDate = lastClosing.closing_time.split('T')[0]
+      // 日結後使用「日結日期 + 1 天」作為新的營業日
+      const closingDate = new Date(lastClosing.closing_time)
+      closingDate.setDate(closingDate.getDate() + 1)
+      saleDate = closingDate.toISOString().split('T')[0]
     } else {
       // 第一次使用（沒有日結記錄），使用當天台灣時區的零點日期
       saleDate = taiwanTime.toISOString().split('T')[0]
@@ -363,7 +366,7 @@ export async function POST(request: NextRequest) {
       draft.items.map(async (item) => {
         const { data: product } = await (supabaseServer
           .from('products') as any)
-          .select('name, cost')
+          .select('name, cost, avg_cost')
           .eq('id', item.product_id)
           .single()
 
@@ -372,7 +375,7 @@ export async function POST(request: NextRequest) {
           product_id: item.product_id,
           quantity: item.quantity,
           price: item.price,
-          cost: product?.cost || 0,
+          cost: product?.avg_cost || product?.cost || 0,  // 優先使用加權平均成本
           snapshot_name: product?.name || null,
           ichiban_kuji_prize_id: item.ichiban_kuji_prize_id || null,
           ichiban_kuji_id: item.ichiban_kuji_id || null,
@@ -440,7 +443,7 @@ export async function POST(request: NextRequest) {
           )
         }
 
-        // 记录购物金使用日志
+        // 记录购物金使用日志（使用台灣時間）
         const { error: logError } = await (supabaseServer
           .from('customer_balance_logs') as any)
           .insert({
@@ -454,6 +457,7 @@ export async function POST(request: NextRequest) {
             ref_no: saleNo,
             note: `销售单 ${saleNo} 使用购物金`,
             created_by: null, // TODO: 从会话获取当前用户
+            created_at: getTaiwanTime(),
           })
 
         if (logError) {

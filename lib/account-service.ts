@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database'
+import { getTaiwanTime } from '@/lib/timezone'
 
 type SupabaseClientType = SupabaseClient<Database>
 
@@ -149,11 +150,13 @@ export async function updateAccountBalance(
     const changeAmount = direction === 'increase' ? amount : -amount
     const newBalance = previousBalance + changeAmount
 
-    // 使用原子性 SQL 更新避免競態條件
-    // 注意：這裡使用 RPC 或直接 SQL 來確保原子性
+    // 使用原子性 SQL 更新避免競態條件（同時更新 updated_at 為台灣時間）
     const { error: updateError } = await (supabase
       .from('accounts') as any)
-      .update({ balance: newBalance })
+      .update({
+        balance: newBalance,
+        updated_at: getTaiwanTime()
+      })
       .eq('id', accountId)
 
     if (updateError) {
@@ -163,7 +166,7 @@ export async function updateAccountBalance(
       }
     }
 
-    // 記錄審計日誌到 account_transactions
+    // 記錄審計日誌到 account_transactions（使用台灣時間）
     const transactionLog = {
       account_id: accountId,
       transaction_type: transactionType, // 使用資料庫的欄位名稱
@@ -175,7 +178,8 @@ export async function updateAccountBalance(
         : transactionType,
       ref_id: referenceId,
       ref_no: referenceNo || null,
-      note: note || null
+      note: note || null,
+      created_at: getTaiwanTime()
     }
 
     const { error: logError } = await (supabase

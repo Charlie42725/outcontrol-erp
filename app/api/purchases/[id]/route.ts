@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { z } from 'zod'
+import { fromZodError } from 'zod-validation-error'
+import { getTaiwanTime } from '@/lib/timezone'
 
 type RouteContext = {
   params: Promise<{ id: string }>
 }
+
+// Schema for basic purchase update
+const purchaseUpdateSchema = z.object({
+  vendor_code: z.string().optional(),
+  note: z.string().optional().nullable(),
+})
 
 // GET /api/purchases/:id - Get purchase details with items
 export async function GET(
@@ -50,6 +59,89 @@ export async function GET(
     return NextResponse.json({
       ok: true,
       data: purchase,
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { ok: false, error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT /api/purchases/:id - Update purchase basic info
+export async function PUT(
+  request: NextRequest,
+  context: RouteContext
+) {
+  try {
+    const { id } = await context.params
+    const body = await request.json()
+
+    // Validate input
+    const validation = purchaseUpdateSchema.safeParse(body)
+    if (!validation.success) {
+      const error = fromZodError(validation.error)
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 400 }
+      )
+    }
+
+    const updates = validation.data
+
+    // 獲取當前進貨單資訊
+    const { data: currentPurchase, error: fetchError } = await (supabaseServer
+      .from('purchases') as any)
+      .select('vendor_code, status')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !currentPurchase) {
+      return NextResponse.json(
+        { ok: false, error: '進貨單不存在' },
+        { status: 404 }
+      )
+    }
+
+    // 如果要修改廠商，驗證新廠商是否存在
+    if (updates.vendor_code && updates.vendor_code !== currentPurchase.vendor_code) {
+      const { data: vendor } = await (supabaseServer
+        .from('vendors') as any)
+        .select('id')
+        .eq('vendor_code', updates.vendor_code)
+        .single()
+
+      if (!vendor) {
+        return NextResponse.json(
+          { ok: false, error: `廠商不存在: ${updates.vendor_code}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // 更新進貨單
+    const updateData: any = {}
+    if (updates.vendor_code) updateData.vendor_code = updates.vendor_code
+    if (updates.note !== undefined) updateData.note = updates.note
+
+    const { data: purchase, error: updateError } = await (supabaseServer
+      .from('purchases') as any)
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      return NextResponse.json(
+        { ok: false, error: updateError.message },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      ok: true,
+      data: purchase,
+      message: '進貨單更新成功'
     })
   } catch (error) {
     return NextResponse.json(
@@ -204,7 +296,7 @@ export async function DELETE(
                 .eq('ref_type', 'settlement')
                 .eq('ref_id', settlementId)
 
-              // 回補帳戶餘額
+              // 回補帳戶餘額（刪除場景：直接還原，不創建反向記錄）
               const { data: account } = await (supabaseServer
                 .from('accounts') as any)
                 .select('balance')
@@ -215,7 +307,10 @@ export async function DELETE(
                 const newBalance = Number(account.balance) + settlement.amount
                 await (supabaseServer
                   .from('accounts') as any)
-                  .update({ balance: newBalance })
+                  .update({
+                    balance: newBalance,
+                    updated_at: getTaiwanTime()
+                  })
                   .eq('id', settlement.account_id)
 
                 console.log(`[Delete Purchase ${id}] Restored account ${settlement.account_id}: +${settlement.amount}`)

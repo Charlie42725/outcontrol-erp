@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { saleUpdateSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
+import { getTaiwanTime } from '@/lib/timezone'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -86,7 +87,24 @@ export async function PATCH(
 
     const { payment_method } = validation.data
 
-    // Get account_id based on payment_method
+    // 1. 讀取舊的 sale 記錄
+    const { data: oldSale, error: fetchError } = await (supabaseServer
+      .from('sales') as any)
+      .select('account_id, total, payment_method')
+      .eq('id', id)
+      .single()
+
+    if (fetchError) {
+      return NextResponse.json(
+        { ok: false, error: 'Sale not found' },
+        { status: 404 }
+      )
+    }
+
+    const oldAccountId = oldSale.account_id
+    const saleTotal = oldSale.total
+
+    // 2. 取得新的 account_id
     const { data: account } = await (supabaseServer
       .from('accounts') as any)
       .select('id')
@@ -94,18 +112,89 @@ export async function PATCH(
       .eq('is_active', true)
       .single()
 
-    const accountId = account?.id || null
+    const newAccountId = account?.id || null
 
-    // 取得台灣時間 (UTC+8)
+    // 3. 如果帳戶有變更，處理餘額轉移
+    if (oldAccountId !== newAccountId) {
+      // 3.1 還原舊帳戶餘額
+      if (oldAccountId) {
+        // 刪除舊的 account_transactions
+        await (supabaseServer
+          .from('account_transactions') as any)
+          .delete()
+          .eq('ref_type', 'sale')
+          .eq('ref_id', id.toString())
+
+        // 還原舊帳戶餘額（減去收入）
+        const { data: oldAccount } = await (supabaseServer
+          .from('accounts') as any)
+          .select('balance')
+          .eq('id', oldAccountId)
+          .single()
+
+        if (oldAccount) {
+          const restoredBalance = oldAccount.balance - saleTotal
+          await (supabaseServer
+            .from('accounts') as any)
+            .update({
+              balance: restoredBalance,
+              updated_at: getTaiwanTime()
+            })
+            .eq('id', oldAccountId)
+
+          console.log(`[Sale PATCH ${id}] Restored old account ${oldAccountId}: -${saleTotal}`)
+        }
+      }
+
+      // 3.2 記錄新帳戶交易
+      if (newAccountId) {
+        const { data: newAccount } = await (supabaseServer
+          .from('accounts') as any)
+          .select('balance')
+          .eq('id', newAccountId)
+          .single()
+
+        if (newAccount) {
+          const newBalance = newAccount.balance + saleTotal
+
+          // 更新新帳戶餘額
+          await (supabaseServer
+            .from('accounts') as any)
+            .update({
+              balance: newBalance,
+              updated_at: getTaiwanTime()
+            })
+            .eq('id', newAccountId)
+
+          // 建立新的 account_transactions
+          await (supabaseServer
+            .from('account_transactions') as any)
+            .insert({
+              account_id: newAccountId,
+              transaction_type: 'sale',
+              amount: saleTotal,
+              balance_before: newAccount.balance,
+              balance_after: newBalance,
+              ref_type: 'sale',
+              ref_id: id.toString(),
+              note: `銷售單 ${id} - 變更支付方式為 ${payment_method}`
+            })
+
+          console.log(`[Sale PATCH ${id}] Recorded new account ${newAccountId}: +${saleTotal}`)
+        }
+      }
+    }
+
+    // 4. 取得台灣時間 (UTC+8)
     const now = new Date()
     const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
 
-    // Update sale payment method and account_id
+    // 5. Update sale payment method and account_id
     const { data: sale, error } = await (supabaseServer
       .from('sales') as any)
       .update({
         payment_method,
-        account_id: accountId,
+        account_id: newAccountId,
         updated_at: taiwanTime.toISOString(),
       })
       .eq('id', id)
@@ -182,21 +271,15 @@ export async function DELETE(
               .update({ store_credit: newBalance })
               .eq('customer_code', sale.customer_code)
 
-            // 记录购物金退回日志
+            // 刪除原使用日誌（避免孤兒記錄）
             await (supabaseServer
               .from('customer_balance_logs') as any)
-              .insert({
-                customer_code: sale.customer_code,
-                amount: refundAmount,
-                balance_before: customer.store_credit,
-                balance_after: newBalance,
-                type: 'refund',
-                ref_type: 'sale_delete',
-                ref_id: id.toString(),
-                ref_no: sale.sale_no,
-                note: `删除销售单 ${sale.sale_no}，退回购物金`,
-                created_by: null,
-              })
+              .delete()
+              .eq('ref_type', 'sale')
+              .eq('ref_id', id.toString())
+              .eq('customer_code', sale.customer_code)
+
+            console.log(`[Delete Sale ${id}] Restored customer ${sale.customer_code} store_credit: +${refundAmount}, deleted balance log`)
           }
         }
       }
@@ -318,12 +401,15 @@ export async function DELETE(
           .single()
 
         if (account) {
-          // 減去這筆銷售的金額（因為是收入，所以要減去）
+          // 減去這筆銷售的金額（刪除場景：直接還原，因為是收入所以要減去）
           const newBalance = account.balance - accountTransaction.amount
 
           await (supabaseServer
             .from('accounts') as any)
-            .update({ balance: newBalance })
+            .update({
+              balance: newBalance,
+              updated_at: getTaiwanTime()
+            })
             .eq('id', accountTransaction.account_id)
 
           console.log(`[Delete Sale ${id}] Restored sale account ${accountTransaction.account_id}: -${accountTransaction.amount}`)
@@ -386,7 +472,10 @@ export async function DELETE(
               const newBalance = Number(account.balance) - settlement.amount
               await (supabaseServer
                 .from('accounts') as any)
-                .update({ balance: newBalance })
+                .update({
+                  balance: newBalance,
+                  updated_at: getTaiwanTime()
+                })
                 .eq('id', settlement.account_id)
 
               console.log(`[Delete Sale ${id}] Restored receipt account ${settlement.account_id}: -${settlement.amount}`)

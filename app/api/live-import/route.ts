@@ -201,8 +201,10 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (lastClosing?.closing_time) {
-          // 使用上次日結時間的日期作為營業日
-          saleDate = lastClosing.closing_time.split('T')[0]
+          // 日結後使用「日結日期 + 1 天」作為新的營業日
+          const closingDate = new Date(lastClosing.closing_time)
+          closingDate.setDate(closingDate.getDate() + 1)
+          saleDate = closingDate.toISOString().split('T')[0]
         } else {
           // 第一次使用（沒有日結記錄），使用當天台灣時區的零點日期
           saleDate = taiwanTime.toISOString().split('T')[0]

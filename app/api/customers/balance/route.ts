@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { balanceAdjustmentSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
+import { getTaiwanTime } from '@/lib/timezone'
 
 // POST /api/customers/balance - 调整客户购物金余额
 export async function POST(request: NextRequest) {
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 2. 创建余额调整记录
+    // 2. 创建余额调整记录（使用台灣時間）
     const { data: log, error: logError } = await (supabaseServer
       .from('customer_balance_logs') as any)
       .insert({
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
         note,
         ref_type: 'manual',
         created_by: null, // TODO: 从会话中获取当前用户
+        created_at: getTaiwanTime(),
       })
       .select()
       .single()

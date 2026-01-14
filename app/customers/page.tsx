@@ -254,80 +254,82 @@ export default function CustomersPage() {
               <table className="w-full">
                 <thead className="border-b bg-gray-50 dark:bg-gray-900">
                   <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">客戶編號</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">客戶名稱</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">電話</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">門市地址</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">宅配地址</th>
-                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">購物金</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">付款方式</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">LINE ID</th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">狀態</th>
-                    <th className="px-6 py-3 text-center text-sm font-semibold text-gray-900 dark:text-gray-100">操作</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">客戶編號</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">客戶名稱</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">電話</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">門市地址</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">宅配地址</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-400">購物金</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">付款方式</th>
+                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">LINE ID</th>
+                    <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">狀態</th>
+                    <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400">操作</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {customers.map((customer) => (
                     <tr key={customer.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{customer.customer_code}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">{customer.customer_name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{customer.phone || '-'}</td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        <div className="max-w-xs truncate" title={customer.store_address || ''}>
+                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{customer.customer_code}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{customer.customer_name}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{customer.phone || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                        <div className="max-w-[200px] truncate" title={customer.store_address || ''}>
                           {customer.store_address || '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        <div className="max-w-xs truncate" title={customer.delivery_address || ''}>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                        <div className="max-w-[200px] truncate" title={customer.delivery_address || ''}>
                           {customer.delivery_address || '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-right">
-                        <span className={`font-semibold ${
+                      <td className="px-4 py-3 text-sm text-right">
+                        <span className={`font-bold ${
                           customer.store_credit >= 0
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-red-600 dark:text-red-400'
                         }`}>
-                          ${customer.store_credit?.toFixed(2) || '0.00'}
+                          ${customer.store_credit?.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '0.00'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                        {customer.payment_method === 'cash' && '現金'}
-                        {customer.payment_method === 'card' && '刷卡'}
-                        {customer.payment_method === 'transfer' && '轉帳'}
-                        {customer.payment_method === 'cod' && '貨到付款'}
-                        {!customer.payment_method && '-'}
+                      <td className="px-4 py-3 text-sm text-center">
+                        <span className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                          {customer.payment_method === 'cash' && '現金'}
+                          {customer.payment_method === 'card' && '刷卡'}
+                          {customer.payment_method === 'transfer' && '轉帳'}
+                          {customer.payment_method === 'cod' && '貨到付款'}
+                          {!customer.payment_method && '-'}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{customer.line_id || '-'}</td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{customer.line_id || '-'}</td>
+                      <td className="px-4 py-3 text-center text-sm">
                         <span
-                          className={`inline-block rounded px-2 py-1 text-xs ${
+                          className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                             customer.is_active
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                           }`}
                         >
                           {customer.is_active ? '啟用' : '停用'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
-                        <div className="flex justify-center gap-2">
+                      <td className="px-4 py-3 text-center text-sm">
+                        <div className="flex justify-center gap-1">
                           <button
                             onClick={() => openAdjustModal(customer)}
-                            className="font-medium text-green-600 dark:text-green-400 hover:underline"
+                            className="rounded px-2 py-1 text-xs font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
                             title="調整購物金"
                           >
-                            購物金
+                            💰
                           </button>
                           <button
                             onClick={() => openEditModal(customer)}
-                            className="font-medium text-blue-600 hover:underline"
+                            className="rounded px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                           >
                             編輯
                           </button>
                           <button
                             onClick={() => handleDelete(customer)}
-                            className="font-medium text-red-600 hover:underline"
+                            className="rounded px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                           >
                             刪除
                           </button>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
 import { accountSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
+import { getTaiwanTime } from '@/lib/timezone'
 
 // GET /api/accounts - 獲取所有帳戶
 export async function GET(request: NextRequest) {
@@ -66,13 +67,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 新增帳戶
+    // 新增帳戶（使用台灣時間）
     const { data, error } = await (supabaseServer.from('accounts') as any)
       .insert({
         account_name: account.account_name,
         account_type: account.account_type,
         balance: account.balance || 0,
         is_active: account.is_active !== false,
+        created_at: getTaiwanTime(),
       })
       .select()
       .single()

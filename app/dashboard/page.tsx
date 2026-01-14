@@ -400,9 +400,9 @@ export default function DashboardPage() {
                       const closingIndex = businessDayClosings.findIndex(c => c.id === closing.id)
                       const previousClosing = businessDayClosings[closingIndex + 1]
                       const startTime = previousClosing
-                        ? new Date(previousClosing.closing_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
+                        ? new Date(previousClosing.closing_time).toLocaleString('zh-TW', { timeZone: 'UTC' })
                         : '開始'
-                      const endTime = new Date(closing.closing_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })
+                      const endTime = new Date(closing.closing_time).toLocaleString('zh-TW', { timeZone: 'UTC' })
 
                       return (
                         <option key={closing.id} value={closing.id}>

@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { settlementSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
 import { updateAccountBalance } from '@/lib/account-service'
+import { getTaiwanDateString } from '@/lib/timezone'
 
 // POST /api/payments - Create payment (vendor payment)
 export async function POST(request: NextRequest) {
@@ -67,13 +68,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create settlement
+    // Create settlement（使用台灣時間）
     const { data: settlement, error: settlementError } = await (supabaseServer
       .from('settlements') as any)
       .insert({
         partner_type: draft.partner_type,
         partner_code: draft.partner_code,
-        trans_date: new Date().toISOString().split('T')[0],
+        trans_date: getTaiwanDateString(),
         direction: draft.direction,
         method: draft.method || 'cash',
         amount: draft.amount,

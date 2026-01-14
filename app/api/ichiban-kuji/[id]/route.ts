@@ -121,33 +121,136 @@ export async function PUT(
       )
     }
 
-    // Delete old prizes
-    await (supabaseServer
+    // 讀取舊的 prizes（包含 ID，用於 UPDATE）
+    const { data: oldPrizes } = await (supabaseServer
       .from('ichiban_kuji_prizes') as any)
-      .delete()
+      .select('id, prize_tier, product_id, quantity, remaining')
       .eq('kuji_id', id)
 
-    // Insert new prizes
-    const prizeInserts = draft.prizes.map(prize => ({
-      kuji_id: id,
-      prize_tier: prize.prize_tier,
-      product_id: prize.product_id,
-      quantity: prize.quantity,
-      remaining: prize.quantity, // 重置剩餘數量等於總數量
-    }))
+    console.log(`[Ichiban Kuji PUT ${id}] Found ${oldPrizes?.length || 0} old prizes`)
 
-    const { error: prizesError } = await (supabaseServer
-      .from('ichiban_kuji_prizes') as any)
-      .insert(prizeInserts)
-
-    if (prizesError) {
-      return NextResponse.json(
-        { ok: false, error: prizesError.message },
-        { status: 500 }
-      )
+    // 建立舊 prizes 的 Map（使用 prize_tier + product_id 作為唯一鍵）
+    const oldPrizesMap = new Map<string, any>()
+    if (oldPrizes && oldPrizes.length > 0) {
+      for (const prize of oldPrizes) {
+        const key = `${prize.prize_tier}_${prize.product_id}`
+        if (oldPrizesMap.has(key)) {
+          console.warn(`[Ichiban Kuji PUT ${id}] Duplicate prize found: ${key}`)
+        }
+        oldPrizesMap.set(key, prize)
+      }
     }
 
-    return NextResponse.json({ ok: true })
+    // 建立新 prizes 的 Map
+    const newPrizesMap = new Map<string, any>()
+    for (const prize of draft.prizes) {
+      const key = `${prize.prize_tier}_${prize.product_id}`
+      newPrizesMap.set(key, prize)
+    }
+
+    let updatedCount = 0
+    let insertedCount = 0
+    let deletedCount = 0
+
+    // 1. UPDATE 或 INSERT 新的 prizes
+    for (const [key, newPrize] of newPrizesMap) {
+      const oldPrize = oldPrizesMap.get(key)
+
+      if (oldPrize) {
+        // 已存在，UPDATE（保留已售出數量）
+        const sold = oldPrize.quantity - oldPrize.remaining
+        const newRemaining = Math.max(0, newPrize.quantity - sold)
+
+        const { error: updateError } = await (supabaseServer
+          .from('ichiban_kuji_prizes') as any)
+          .update({
+            quantity: newPrize.quantity,
+            remaining: newRemaining,
+          })
+          .eq('id', oldPrize.id)
+
+        if (updateError) {
+          console.error(`[Ichiban Kuji PUT ${id}] Failed to update prize ${key}:`, updateError)
+          return NextResponse.json(
+            { ok: false, error: `更新賞項失敗: ${updateError.message}` },
+            { status: 500 }
+          )
+        }
+
+        updatedCount++
+        console.log(`[Ichiban Kuji PUT ${id}] Updated prize ${key}: quantity ${oldPrize.quantity} -> ${newPrize.quantity}, remaining ${oldPrize.remaining} -> ${newRemaining}`)
+      } else {
+        // 不存在，INSERT
+        const { error: insertError } = await (supabaseServer
+          .from('ichiban_kuji_prizes') as any)
+          .insert({
+            kuji_id: id,
+            prize_tier: newPrize.prize_tier,
+            product_id: newPrize.product_id,
+            quantity: newPrize.quantity,
+            remaining: newPrize.quantity,
+          })
+
+        if (insertError) {
+          console.error(`[Ichiban Kuji PUT ${id}] Failed to insert prize ${key}:`, insertError)
+          return NextResponse.json(
+            { ok: false, error: `新增賞項失敗: ${insertError.message}` },
+            { status: 500 }
+          )
+        }
+
+        insertedCount++
+        console.log(`[Ichiban Kuji PUT ${id}] Inserted new prize ${key}`)
+      }
+    }
+
+    // 2. DELETE 被移除的 prizes（檢查是否有銷售記錄）
+    for (const [key, oldPrize] of oldPrizesMap) {
+      if (!newPrizesMap.has(key)) {
+        // 檢查是否有銷售記錄
+        const { data: saleItems } = await (supabaseServer
+          .from('sale_items') as any)
+          .select('id')
+          .eq('ichiban_kuji_prize_id', oldPrize.id)
+          .limit(1)
+
+        if (saleItems && saleItems.length > 0) {
+          console.warn(`[Ichiban Kuji PUT ${id}] Cannot delete prize ${key} - has sale records`)
+          return NextResponse.json(
+            { ok: false, error: `賞項 ${oldPrize.prize_tier} 已有銷售記錄，無法刪除。請保留此賞項或將數量設為 0。` },
+            { status: 400 }
+          )
+        }
+
+        // 沒有銷售記錄，可以刪除
+        const { error: deleteError } = await (supabaseServer
+          .from('ichiban_kuji_prizes') as any)
+          .delete()
+          .eq('id', oldPrize.id)
+
+        if (deleteError) {
+          console.error(`[Ichiban Kuji PUT ${id}] Failed to delete prize ${key}:`, deleteError)
+          return NextResponse.json(
+            { ok: false, error: `刪除賞項失敗: ${deleteError.message}` },
+            { status: 500 }
+          )
+        }
+
+        deletedCount++
+        console.log(`[Ichiban Kuji PUT ${id}] Deleted prize ${key}`)
+      }
+    }
+
+    console.log(`[Ichiban Kuji PUT ${id}] Summary: updated ${updatedCount}, inserted ${insertedCount}, deleted ${deletedCount}`)
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        prizes_updated: updatedCount,
+        prizes_inserted: insertedCount,
+        prizes_deleted: deletedCount
+      }
+    })
   } catch (error) {
     return NextResponse.json(
       { ok: false, error: 'Internal server error' },

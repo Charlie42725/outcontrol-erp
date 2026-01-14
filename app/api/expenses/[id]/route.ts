@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase/server'
 import { expenseSchema } from '@/lib/schemas'
 import { fromZodError } from 'zod-validation-error'
 import { updateAccountBalance } from '@/lib/account-service'
+import { getTaiwanTime } from '@/lib/timezone'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -98,7 +99,10 @@ export async function PUT(
         const restoredBalance = Number(oldAccount.balance) + oldAmount
         await (supabaseServer
           .from('accounts') as any)
-          .update({ balance: restoredBalance })
+          .update({
+            balance: restoredBalance,
+            updated_at: getTaiwanTime()
+          })
           .eq('id', oldAccountId)
       }
     }
@@ -124,50 +128,23 @@ export async function PUT(
       )
     }
 
-    // 4. 重新記帳（先檢查是否已有記錄，防止重複）
+    // 4. 重新記帳（使用 updateAccountBalance 確保一致性和冪等性）
     if (newAccountId) {
-      // 檢查是否已經有新記錄（防止重複提交）
-      const { data: existingLog } = await (supabaseServer
-        .from('account_transactions') as any)
-        .select('id')
-        .eq('ref_type', 'expense')
-        .eq('ref_id', id)
-        .limit(1)
-        .maybeSingle()
+      const result = await updateAccountBalance(
+        supabaseServer,
+        newAccountId,
+        newAmount,
+        'expense',
+        'expense',
+        id,
+        newExpense.note || undefined
+      )
 
-      if (!existingLog) {
-        // 沒有記錄，才進行記帳
-        const { data: newAccount } = await (supabaseServer
-          .from('accounts') as any)
-          .select('balance')
-          .eq('id', newAccountId)
-          .single()
-
-        if (newAccount) {
-          const newBalance = Number(newAccount.balance) - newAmount
-
-          // 更新帳戶餘額
-          await (supabaseServer
-            .from('accounts') as any)
-            .update({ balance: newBalance })
-            .eq('id', newAccountId)
-
-          // 建立新的 account_transactions 記錄
-          await (supabaseServer
-            .from('account_transactions') as any)
-            .insert({
-              account_id: newAccountId,
-              transaction_type: 'expense',
-              amount: newAmount,
-              balance_before: newAccount.balance,
-              balance_after: newBalance,
-              ref_type: 'expense',
-              ref_id: id,
-              note: newExpense.note || null
-            })
-        }
-      } else {
-        console.log(`[Expenses API] 費用 ${id} 已有交易記錄，跳過重複記帳`)
+      if (!result.success) {
+        console.error(`[Expenses API] 費用 ${id} 記帳失敗:`, result.error)
+        // 不返回錯誤，因為 expense 記錄已經更新成功
+      } else if (result.warning) {
+        console.log(`[Expenses API] ${result.warning}`)
       }
     }
 
@@ -223,7 +200,10 @@ export async function DELETE(
 
         const { error: updateError } = await (supabaseServer
           .from('accounts') as any)
-          .update({ balance: newBalance })
+          .update({
+            balance: newBalance,
+            updated_at: getTaiwanTime()
+          })
           .eq('id', expense.account_id)
 
         if (updateError) {
