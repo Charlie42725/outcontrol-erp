@@ -248,25 +248,10 @@ export async function POST(request: NextRequest) {
     const taiwanTime = new Date(now.getTime() + 8 * 60 * 60 * 1000)
     const createdAt = taiwanTime.toISOString() // 完整的台灣時間戳記
 
-    // 根據上次日結時間決定 sale_date（營業日）
-    let saleDate: string
-    const { data: lastClosing } = await (supabaseServer
-      .from('business_day_closings') as any)
-      .select('closing_time')
-      .eq('source', draft.source)
-      .order('closing_time', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (lastClosing?.closing_time) {
-      // 日結後使用「日結日期 + 1 天」作為新的營業日
-      const closingDate = new Date(lastClosing.closing_time)
-      closingDate.setDate(closingDate.getDate() + 1)
-      saleDate = closingDate.toISOString().split('T')[0]
-    } else {
-      // 第一次使用（沒有日結記錄），使用當天台灣時區的零點日期
-      saleDate = taiwanTime.toISOString().split('T')[0]
-    }
+    // 直接使用當前台灣日期作為 sale_date（營業日）
+    // 修正：之前的邏輯是「日結日期+1天」，這會導致15號日結後，15號的銷售變成16號
+    // 正確做法：使用銷售當下的台灣日期
+    const saleDate = taiwanTime.toISOString().split('T')[0]
 
     // Start transaction-like operations
     // 1. Create sale (draft)

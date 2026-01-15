@@ -149,14 +149,17 @@ export default function AccountsPage() {
           </button>
         </div>
 
-        {/* Add/Edit Form */}
+        {/* Add/Edit Modal */}
         {showAddForm && (
-          <div className="mb-6 rounded-lg bg-white dark:bg-gray-800 p-6 shadow">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
-              {editingAccount ? '編輯帳戶' : '新增帳戶'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={cancelEdit}>
+            <div
+              className="mx-4 w-full max-w-lg rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
+                {editingAccount ? '編輯帳戶' : '新增帳戶'}
+              </h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-900 dark:text-gray-100">
                     帳戶名稱 *
@@ -164,11 +167,12 @@ export default function AccountsPage() {
                   <input
                     type="text"
                     required
+                    autoFocus
                     value={formData.account_name}
                     onChange={(e) =>
                       setFormData({ ...formData, account_name: e.target.value })
                     }
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
                     placeholder="例如：國泰銀行、富邦銀行"
                   />
                 </div>
@@ -186,7 +190,7 @@ export default function AccountsPage() {
                         account_type: e.target.value as 'cash' | 'bank' | 'petty_cash',
                       })
                     }
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
                   >
                     <option value="cash">現金</option>
                     <option value="bank">銀行</option>
@@ -204,7 +208,7 @@ export default function AccountsPage() {
                     onChange={(e) =>
                       setFormData({ ...formData, balance: Number(e.target.value) })
                     }
-                    className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
+                    className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
                   />
                 </div>
 
@@ -221,24 +225,24 @@ export default function AccountsPage() {
                     啟用
                   </label>
                 </div>
-              </div>
 
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                >
-                  {editingAccount ? '更新' : '新增'}
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
-                >
-                  取消
-                </button>
-              </div>
-            </form>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                  >
+                    {editingAccount ? '更新' : '新增'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEdit}
+                    className="flex-1 rounded bg-gray-500 px-4 py-2 text-white hover:bg-gray-600"
+                  >
+                    取消
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
