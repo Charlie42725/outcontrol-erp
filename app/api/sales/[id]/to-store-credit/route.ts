@@ -236,18 +236,25 @@ export async function POST(
             }
         }
 
-        // 8. 更新銷售單狀態（如果全額轉換）
+        // 8. 更新銷售單狀態
         if (isFullConversion) {
-            await (supabaseServer
+            const { error: updateError } = await (supabaseServer
                 .from('sales') as any)
                 .update({
-                    status: 'refunded',
+                    status: 'store_credit', // 標記為已轉購物金
+                    is_paid: true, // 視為已收款（以購物金方式結清）
                     total: 0,
                     updated_at: getTaiwanTime(),
                 })
                 .eq('id', id)
+
+            if (updateError) {
+                console.error('[To Store Credit] Failed to update sale status:', updateError)
+            } else {
+                console.log('[To Store Credit] Sale status updated to store_credit')
+            }
         } else {
-            // 部分轉換：更新銷售總額
+            // 部分轉換：更新銷售總額，保持部分未收款狀態
             await (supabaseServer
                 .from('sales') as any)
                 .update({

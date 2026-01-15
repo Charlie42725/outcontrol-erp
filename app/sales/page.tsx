@@ -823,12 +823,14 @@ export default function SalesPage() {
                                   </td>
                                   <td className="py-2 text-center text-sm">
                                     <span
-                                      className={`inline-flex items-center gap-1 text-xs ${sale.is_paid
-                                        ? 'text-green-600 dark:text-green-400'
-                                        : 'text-gray-500 dark:text-gray-400'
+                                      className={`inline-flex items-center gap-1 text-xs ${sale.status === 'store_credit'
+                                        ? 'text-purple-600 dark:text-purple-400'
+                                        : sale.is_paid
+                                          ? 'text-green-600 dark:text-green-400'
+                                          : 'text-gray-500 dark:text-gray-400'
                                         }`}
                                     >
-                                      {sale.is_paid ? '✓ 已收' : '○ 未收'}
+                                      {sale.status === 'store_credit' ? '💰 轉購物金' : sale.is_paid ? '✓ 已收' : '○ 未收'}
                                     </span>
                                   </td>
                                   <td className="py-2 text-center text-sm">
@@ -1053,12 +1055,14 @@ export default function SalesPage() {
                             <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{formatDateTime(sale.created_at)}</td>
                             <td className="px-6 py-4 text-center text-sm">
                               <span
-                                className={`inline-flex items-center gap-1 text-xs ${sale.is_paid
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-gray-500 dark:text-gray-400'
+                                className={`inline-flex items-center gap-1 text-xs ${sale.status === 'store_credit'
+                                  ? 'text-purple-600 dark:text-purple-400'
+                                  : sale.is_paid
+                                    ? 'text-green-600 dark:text-green-400'
+                                    : 'text-gray-500 dark:text-gray-400'
                                   }`}
                               >
-                                {sale.is_paid ? '✓ 已收' : '○ 未收'}
+                                {sale.status === 'store_credit' ? '💰 轉購物金' : sale.is_paid ? '✓ 已收' : '○ 未收'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-center text-sm">

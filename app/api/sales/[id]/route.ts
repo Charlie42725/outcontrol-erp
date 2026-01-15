@@ -324,6 +324,63 @@ export async function DELETE(
       }
     }
 
+    // 1.7. 如果是轉購物金的銷售，需要扣回購物金
+    if (sale.status === 'store_credit' && sale.customer_code) {
+      // 查找轉購物金的記錄
+      const { data: storeCreditLogs } = await (supabaseServer
+        .from('customer_balance_logs') as any)
+        .select('id, amount')
+        .eq('ref_type', 'sale_to_store_credit')
+        .eq('ref_id', id.toString())
+        .eq('customer_code', sale.customer_code)
+
+      if (storeCreditLogs && storeCreditLogs.length > 0) {
+        // 計算總共轉換的購物金
+        const totalStoreCredit = storeCreditLogs.reduce((sum: number, log: any) => sum + log.amount, 0)
+
+        // 獲取客戶當前購物金餘額
+        const { data: customer } = await (supabaseServer
+          .from('customers') as any)
+          .select('store_credit')
+          .eq('customer_code', sale.customer_code)
+          .single()
+
+        if (customer && totalStoreCredit > 0) {
+          const newBalance = customer.store_credit - totalStoreCredit
+
+          // 更新客戶購物金餘額（扣回）
+          await (supabaseServer
+            .from('customers') as any)
+            .update({ store_credit: newBalance })
+            .eq('customer_code', sale.customer_code)
+
+          // 建立扣回記錄
+          await (supabaseServer
+            .from('customer_balance_logs') as any)
+            .insert({
+              customer_code: sale.customer_code,
+              amount: -totalStoreCredit,
+              balance_before: customer.store_credit,
+              balance_after: newBalance,
+              type: 'deduct',
+              ref_type: 'sale_delete',
+              ref_id: id.toString(),
+              note: `刪除銷售單 ${sale.sale_no}，扣回轉換的購物金`,
+            })
+
+          // 刪除原轉換記錄
+          await (supabaseServer
+            .from('customer_balance_logs') as any)
+            .delete()
+            .eq('ref_type', 'sale_to_store_credit')
+            .eq('ref_id', id.toString())
+            .eq('customer_code', sale.customer_code)
+
+          console.log(`[Delete Sale ${id}] Deducted store_credit ${totalStoreCredit} from customer ${sale.customer_code}`)
+        }
+      }
+    }
+
     // 2. 刪除銷貨更正產生的庫存日誌（避免重複回補）
     // 更正時已經回補過的庫存不應該再回補
     const { data: correctionLogs } = await (supabaseServer
@@ -364,10 +421,13 @@ export async function DELETE(
       .select('id, status, delivery_no')
       .eq('sale_id', id)
 
-    // 3. For each delivery, restore inventory by inserting reverse logs
+    // 4. For each delivery, restore inventory by inserting reverse logs
+    // 注意：如果銷售單是轉購物金狀態，庫存已在轉換時回補過，不需要再次回補
+    const skipInventoryRestore = sale.status === 'store_credit'
+
     for (const delivery of deliveries || []) {
       // 只有 confirmed 的 delivery 才有扣庫存，才需要回補
-      if (delivery.status === 'confirmed') {
+      if (delivery.status === 'confirmed' && !skipInventoryRestore) {
         // 獲取該出貨單的所有庫存扣除記錄
         const { data: inventoryLogs } = await (supabaseServer
           .from('inventory_logs') as any)
