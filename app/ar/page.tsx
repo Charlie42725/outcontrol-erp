@@ -650,11 +650,11 @@ export default function ARPageV2() {
                 }, 0)
                 const receivedPercentage = totalAmount > 0 ? (receivedAmount / totalAmount) * 100 : 0
 
-                // 找到最近到期日
-                const upcomingDue = unpaidAccounts
-                  .map(acc => ({ date: acc.due_date, days: getDaysUntilDue(acc.due_date) }))
-                  .filter(d => d.days >= 0)
-                  .sort((a, b) => a.days - b.days)[0]
+                // 找到最近的銷售日期
+                const latestSaleDate = unpaidAccounts
+                  .filter(acc => acc.sales?.sale_date)
+                  .map(acc => acc.sales!.sale_date)
+                  .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
 
                 return (
                   <div key={group.partner_code} className="border-b border-gray-200 dark:border-gray-700 last:border-b-0">
@@ -703,12 +703,9 @@ export default function ARPageV2() {
                             </div>
 
                             <div className="rounded bg-gray-50 dark:bg-gray-800 px-2 py-1">
-                              <div className="text-[10px] text-gray-500 dark:text-gray-400">最近到期</div>
-                              <div className={`text-xs font-semibold ${upcomingDue?.days === 0 ? 'text-orange-600 dark:text-orange-400' :
-                                upcomingDue?.days && upcomingDue.days <= 3 ? 'text-orange-500 dark:text-orange-300' :
-                                  'text-gray-900 dark:text-gray-100'
-                                }`}>
-                                {upcomingDue ? formatDate(upcomingDue.date) : '-'}
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400">銷售日期</div>
+                              <div className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                                {latestSaleDate ? formatDate(latestSaleDate) : '-'}
                               </div>
                             </div>
                           </div>
@@ -755,7 +752,7 @@ export default function ARPageV2() {
                               <th className="pb-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400">商品</th>
                               <th className="pb-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pr-4" style={{ width: '80px' }}>數量</th>
                               <th className="pb-2 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pr-6" style={{ width: '110px' }}>餘額</th>
-                              <th className="pb-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400" style={{ width: '140px' }}>到期日</th>
+                              <th className="pb-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400" style={{ width: '140px' }}>銷售日</th>
                               <th className="pb-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-400" style={{ width: '90px' }}>狀態</th>
                             </tr>
                           </thead>
@@ -821,13 +818,8 @@ export default function ARPageV2() {
                                     </div>
                                   </td>
                                   <td className="py-3 align-top">
-                                    <div className={`text-sm font-medium ${isOverdue
-                                      ? 'text-red-600 dark:text-red-400'
-                                      : daysOverdue >= -3 && daysOverdue < 0
-                                        ? 'text-orange-600 dark:text-orange-400'
-                                        : 'text-gray-900 dark:text-gray-100'
-                                      }`}>
-                                      {formatDueDate(account.due_date, account.status)}
+                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                      {account.sales?.sale_date ? formatDate(account.sales.sale_date) : '-'}
                                     </div>
                                   </td>
                                   <td className="py-3 text-center align-top">
