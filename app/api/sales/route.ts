@@ -233,11 +233,20 @@ export async function POST(request: NextRequest) {
 
     const saleNo = generateCode('S', saleCount)
 
-    // Get account_id based on payment_method
+    // Determine primary payment method and account
+    // If payments array provided, use largest amount; otherwise use single payment_method
+    let primaryPaymentMethod = draft.payment_method
+    if (draft.payments && draft.payments.length > 0) {
+      // Find payment with largest amount
+      const largest = draft.payments.reduce((max, p) => p.amount > max.amount ? p : max, draft.payments[0])
+      primaryPaymentMethod = largest.method
+    }
+
+    // Get account_id based on primary payment_method
     const { data: account } = await (supabaseServer
       .from('accounts') as any)
       .select('id')
-      .eq('payment_method_code', draft.payment_method)
+      .eq('payment_method_code', primaryPaymentMethod)
       .eq('is_active', true)
       .single()
 
@@ -560,23 +569,43 @@ export async function POST(request: NextRequest) {
     }
 
     // 6.5. 更新帳戶餘額（僅當已付款時）
-    if (draft.is_paid && accountId) {
-      const accountUpdate = await updateAccountBalance({
-        supabase: supabaseServer,
-        accountId,
-        paymentMethod: draft.payment_method,
-        amount: finalTotal, // 使用扣除購物金後的最終金額
-        direction: 'increase', // 銷售收款 = 現金流入
-        transactionType: 'sale',
-        referenceId: sale.id,
-        referenceNo: saleNo,
-        note: draft.note
-      })
+    if (draft.is_paid) {
+      // Determine payments to process
+      const paymentsToProcess = draft.payments && draft.payments.length > 0
+        ? draft.payments
+        : [{ method: draft.payment_method, amount: finalTotal }]
 
-      if (!accountUpdate.success) {
-        console.error(`[Sales API] 銷售 ${saleNo} 更新帳戶餘額失敗:`, accountUpdate.error)
-        // 決策：僅記錄錯誤，不阻止銷售完成（可稍後手動調整）
-        // 銷售記錄比帳戶餘額更重要，避免中斷用戶交易流程
+      // Process each payment
+      for (const payment of paymentsToProcess) {
+        // Get account for this payment method
+        const { data: paymentAccount } = await (supabaseServer
+          .from('accounts') as any)
+          .select('id')
+          .eq('payment_method_code', payment.method)
+          .eq('is_active', true)
+          .single()
+
+        if (paymentAccount) {
+          const accountUpdate = await updateAccountBalance({
+            supabase: supabaseServer,
+            accountId: paymentAccount.id,
+            paymentMethod: payment.method,
+            amount: payment.amount,
+            direction: 'increase', // 銷售收款 = 現金流入
+            transactionType: 'sale',
+            referenceId: sale.id,
+            referenceNo: saleNo,
+            note: draft.payments && draft.payments.length > 1
+              ? `多元付款 - ${payment.method}: $${payment.amount}`
+              : draft.note
+          })
+
+          if (!accountUpdate.success) {
+            console.error(`[Sales API] 銷售 ${saleNo} 更新帳戶 ${payment.method} 餘額失敗:`, accountUpdate.error)
+          }
+        } else {
+          console.warn(`[Sales API] 找不到付款方式 ${payment.method} 對應的帳戶`)
+        }
       }
     }
 

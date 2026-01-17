@@ -149,6 +149,13 @@ export default function POSPage() {
   // 收款與找零
   const [receivedAmount, setReceivedAmount] = useState<string>('')
 
+  // 多元付款
+  type MultiPayment = { method: PaymentMethod; amount: string }
+  const [isMultiPayment, setIsMultiPayment] = useState(false)
+  const [multiPayments, setMultiPayments] = useState<MultiPayment[]>([
+    { method: 'cash', amount: '' }
+  ])
+
   // 結帳成功 Toast
   const [successToast, setSuccessToast] = useState<{
     show: boolean
@@ -704,13 +711,19 @@ export default function POSPage() {
           source: salesMode,
           payment_method: paymentMethod,
           is_paid: isPaid,
-          is_delivered: isDelivered, // 新增：是否已出貨
-          delivery_method: !isDelivered ? deliveryMethod : undefined, // 未出貨時保存交貨方式
-          expected_delivery_date: !isDelivered ? expectedDeliveryDate : undefined, // 未出貨時保存預計出貨日
-          delivery_note: !isDelivered ? deliveryNote : undefined, // 未出貨時保存備註
+          is_delivered: isDelivered,
+          delivery_method: !isDelivered ? deliveryMethod : undefined,
+          expected_delivery_date: !isDelivered ? expectedDeliveryDate : undefined,
+          delivery_note: !isDelivered ? deliveryNote : undefined,
           note: note || undefined,
           discount_type: discountType,
           discount_value: discountValue,
+          // 多元付款：傳送 payments 陣列
+          payments: isMultiPayment && isPaid
+            ? multiPayments
+              .filter(p => parseFloat(p.amount) > 0)
+              .map(p => ({ method: p.method, amount: parseFloat(p.amount) }))
+            : undefined,
           items: checkoutCart.map((item) => ({
             product_id: item.product_id,
             quantity: item.quantity,
@@ -736,7 +749,10 @@ export default function POSPage() {
         setNote('')
         setDiscountType('none')
         setDiscountValue(0)
-        setReceivedAmount('') // 清空收款金額
+        setReceivedAmount('')
+        // 重置多元付款
+        setIsMultiPayment(false)
+        setMultiPayments([{ method: 'cash', amount: '' }])
         fetchTodaySales() // Refresh today's sales
         fetchIchibanKujis() // Refresh ichiban kuji inventory
         fetchCustomers() // Refresh customers to update store credit
@@ -1649,116 +1665,229 @@ export default function POSPage() {
               {/* Payment Method - Button Grid */}
               <div>
                 <label className="block font-medium mb-1.5 text-sm text-slate-300">付款方式</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('cash')
-                      setIsPaid(true)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'cash'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    💵 現金
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('card')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'card'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    💳 刷卡
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('transfer_cathay')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_cathay'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    🏦 國泰
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('transfer_fubon')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_fubon'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    🏦 富邦
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('transfer_esun')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_esun'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    🏦 玉山
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('transfer_union')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_union'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    🏦 聯邦
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('transfer_linepay')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_linepay'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    💚 LINE
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('cod')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'cod'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    📦 貨到
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('pending')
-                      setIsPaid(false)
-                    }}
-                    className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'pending'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                  >
-                    ❓ 待定
-                  </button>
-                </div>
+
+                {/* 單一付款模式：顯示原本的付款方式按鈕 */}
+                {!isMultiPayment && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('cash')
+                        setIsPaid(true)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'cash'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      💵 現金
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('card')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'card'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      💳 刷卡
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('transfer_cathay')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_cathay'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      🏦 國泰
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('transfer_fubon')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_fubon'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      🏦 富邦
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('transfer_esun')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_esun'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      🏦 玉山
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('transfer_union')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_union'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      🏦 聯邦
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('transfer_linepay')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_linepay'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      💚 LINE
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('cod')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'cod'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      📦 貨到
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('pending')
+                        setIsPaid(false)
+                      }}
+                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'pending'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                    >
+                      ❓ 待定
+                    </button>
+                  </div>
+                )}
+
+                {/* Multi-payment toggle */}
+                {isPaid && !isMultiPayment && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => {
+                        setIsMultiPayment(true)
+                        setMultiPayments([{ method: paymentMethod as PaymentMethod, amount: String(finalTotal) }])
+                      }}
+                      className="w-full py-2 rounded-lg text-sm font-medium transition-all bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600"
+                    >
+                      ➕ 切換多元付款
+                    </button>
+                  </div>
+                )}
+
+                {/* Multi-payment inputs */}
+                {isMultiPayment && isPaid && (
+                  <div className="space-y-2 p-3 bg-slate-700/50 rounded-lg border border-orange-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium text-orange-400">🔀 多元付款模式</div>
+                      <button
+                        onClick={() => {
+                          setIsMultiPayment(false)
+                          setMultiPayments([{ method: 'cash', amount: '' }])
+                        }}
+                        className="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-600 hover:bg-slate-500 transition-colors"
+                      >
+                        ← 返回單一付款
+                      </button>
+                    </div>
+                    {multiPayments.map((payment, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <select
+                          value={payment.method}
+                          onChange={(e) => {
+                            const updated = [...multiPayments]
+                            updated[index].method = e.target.value as PaymentMethod
+                            setMultiPayments(updated)
+                          }}
+                          className="flex-1 rounded px-2 py-1.5 text-sm bg-slate-600 text-white border border-slate-500 focus:border-indigo-500 focus:outline-none"
+                        >
+                          <option value="cash">💵 現金</option>
+                          <option value="card">💳 刷卡</option>
+                          <option value="transfer_cathay">🏦 國泰</option>
+                          <option value="transfer_fubon">🏦 富邦</option>
+                          <option value="transfer_esun">🏦 玉山</option>
+                          <option value="transfer_union">🏦 聯邦</option>
+                          <option value="transfer_linepay">💚 LINE</option>
+                          <option value="cod">📦 貨到</option>
+                        </select>
+                        <input
+                          type="number"
+                          value={payment.amount}
+                          onChange={(e) => {
+                            const updated = [...multiPayments]
+                            updated[index].amount = e.target.value
+                            setMultiPayments(updated)
+                          }}
+                          placeholder="金額"
+                          className="w-24 rounded px-2 py-1.5 text-sm text-right bg-slate-600 text-white border border-slate-500 focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        {multiPayments.length > 1 && (
+                          <button
+                            onClick={() => {
+                              setMultiPayments(multiPayments.filter((_, i) => i !== index))
+                            }}
+                            className="text-red-400 hover:text-red-300 px-1"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        setMultiPayments([...multiPayments, { method: 'cash', amount: '' }])
+                      }}
+                      className="w-full py-1.5 text-xs text-slate-400 hover:text-white border border-dashed border-slate-500 rounded hover:border-slate-400 transition-colors"
+                    >
+                      ＋ 新增付款方式
+                    </button>
+
+                    {/* 金額統計 */}
+                    <div className="pt-2 border-t border-slate-600 space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">已分配</span>
+                        <span className={`font-bold ${multiPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) === finalTotal
+                          ? 'text-emerald-400'
+                          : 'text-orange-400'
+                          }`}>
+                          {formatCurrency(multiPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">應收</span>
+                        <span className="text-white">{formatCurrency(finalTotal)}</span>
+                      </div>
+                      {multiPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) !== finalTotal && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-orange-400">差額</span>
+                          <span className="text-orange-400 font-bold">
+                            {formatCurrency(Math.abs(finalTotal - multiPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0)))}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Discount - Button Selection */}
@@ -1875,9 +2004,15 @@ export default function POSPage() {
             {/* Checkout Button - Fixed at bottom - 放大結帳按鈕 */}
             <div className="p-3 border-t border-slate-700 bg-slate-800">
               {/* 現金不足提示 */}
-              {paymentMethod === 'cash' && cart.length > 0 && receivedAmount && parseFloat(receivedAmount) > 0 && parseFloat(receivedAmount) < finalTotal && (
+              {!isMultiPayment && paymentMethod === 'cash' && cart.length > 0 && receivedAmount && parseFloat(receivedAmount) > 0 && parseFloat(receivedAmount) < finalTotal && (
                 <div className="mb-2 text-center text-red-400 text-sm">
                   收款不足，尚差 {formatCurrency(finalTotal - parseFloat(receivedAmount))}
+                </div>
+              )}
+              {/* 多元付款金額不符提示 */}
+              {isMultiPayment && isPaid && cart.length > 0 && multiPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) !== finalTotal && (
+                <div className="mb-2 text-center text-orange-400 text-sm">
+                  ⚠️ 付款金額不符，請調整分配金額
                 </div>
               )}
               <button
@@ -1886,7 +2021,9 @@ export default function POSPage() {
                   loading ||
                   cart.length === 0 ||
                   // 現金付款且有輸入金額但不足時禁用
-                  (paymentMethod === 'cash' && !!receivedAmount && parseFloat(receivedAmount) > 0 && parseFloat(receivedAmount) < finalTotal)
+                  (!isMultiPayment && paymentMethod === 'cash' && !!receivedAmount && parseFloat(receivedAmount) > 0 && parseFloat(receivedAmount) < finalTotal) ||
+                  // 多元付款金額不符時禁用
+                  (isMultiPayment && isPaid && multiPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0) !== finalTotal)
                 }
                 className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-600 text-white font-bold text-xl py-4 rounded-lg transition-all active:scale-[0.98] disabled:cursor-not-allowed"
               >

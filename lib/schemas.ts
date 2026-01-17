@@ -67,6 +67,22 @@ export const saleDraftSchema = z.object({
   note: z.string().optional(),
   discount_type: z.enum(['none', 'percent', 'amount']).default('none'),
   discount_value: z.number().min(0, 'Discount must be positive').default(0),
+  // Multi-payment support
+  payments: z.array(
+    z.object({
+      method: z.enum([
+        'cash',
+        'card',
+        'transfer_cathay',
+        'transfer_fubon',
+        'transfer_esun',
+        'transfer_union',
+        'transfer_linepay',
+        'cod',
+      ]),
+      amount: z.number().positive('Amount must be positive'),
+    })
+  ).optional(),
   items: z.array(
     z.object({
       product_id: z.string().uuid(),
