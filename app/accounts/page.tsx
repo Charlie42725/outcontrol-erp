@@ -55,7 +55,7 @@ export default function AccountsPage() {
   const [adjustmentData, setAdjustmentData] = useState({
     accountId: '',
     accountName: '',
-    amount: 0,
+    amount: '',  // Use string to allow typing negative numbers
     date: new Date().toISOString().split('T')[0],
     note: ''
   })
@@ -83,7 +83,7 @@ export default function AccountsPage() {
     setAdjustmentData({
       accountId: account.id,
       accountName: account.account_name,
-      amount: 0,
+      amount: '',  // Reset to empty string
       date: new Date().toISOString().split('T')[0],
       note: ''
     })
@@ -99,7 +99,7 @@ export default function AccountsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           accountId: adjustmentData.accountId,
-          amount: adjustmentData.amount,
+          amount: parseFloat(adjustmentData.amount) || 0,  // Convert string to number on submit
           date: adjustmentData.date,
           note: adjustmentData.note
         })
@@ -273,10 +273,17 @@ export default function AccountsPage() {
                     調整金額 (正數增加，負數減少)
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     required
                     value={adjustmentData.amount}
-                    onChange={(e) => setAdjustmentData({ ...adjustmentData, amount: Number(e.target.value) })}
+                    onChange={(e) => {
+                      // Allow empty, negative sign, and numbers
+                      const value = e.target.value
+                      if (value === '' || value === '-' || /^-?\d*\.?\d*$/.test(value)) {
+                        setAdjustmentData({ ...adjustmentData, amount: value })
+                      }
+                    }}
                     className="w-full rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:outline-none"
                     placeholder="輸入金額"
                   />

@@ -229,13 +229,13 @@ export async function POST(request: NextRequest) {
     // 3. Calculate total
     const total = draft.items.reduce((sum, item) => sum + (item.quantity * item.cost), 0)
 
-    // 4. Update purchase to confirmed (老板创建的进货单直接确认，不需要审核)
+    // 4. Update purchase to approved (老板创建的进货单直接审核通过，不需要审核)
     // 库存不在这里增加，等收货时再增加
     const { data: confirmedPurchase, error: confirmError } = await (supabaseServer
       .from('purchases') as any)
       .update({
         total,
-        status: 'confirmed', // 老板创建的进货单直接确认
+        status: 'approved', // 老板创建的进货单直接审核通过
       })
       .eq('id', purchase.id)
       .select()
