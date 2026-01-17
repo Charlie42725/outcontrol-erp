@@ -253,11 +253,17 @@ export async function getAccountTransactions(
     endDate?: string
     transactionType?: 'purchase_payment' | 'customer_payment' | 'sale' | 'expense' | 'adjustment'
     limit?: number
+    page?: number
   }
 ) {
+  const limit = options?.limit || 50
+  const page = options?.page || 1
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+
   let query = (supabase
     .from('account_transactions') as any)
-    .select('*')
+    .select('*', { count: 'exact' })
     .eq('account_id', accountId)
     .order('created_at', { ascending: false })
 
@@ -266,23 +272,29 @@ export async function getAccountTransactions(
   }
 
   if (options?.endDate) {
-    query = query.lte('created_at', options.endDate)
+    // End date should include the whole day, so we might need to adjust if it's just YYYY-MM-DD
+    // But usually frontend sends full ISO or we handle it.
+    // If it is YYYY-MM-DD, we should probably append 23:59:59 or use lt next day.
+    // checks if it contains time
+    if (options.endDate.includes('T')) {
+      query = query.lte('created_at', options.endDate)
+    } else {
+      query = query.lte('created_at', `${options.endDate}T23:59:59`)
+    }
   }
 
   if (options?.transactionType) {
     query = query.eq('transaction_type', options.transactionType)
   }
 
-  if (options?.limit) {
-    query = query.limit(options.limit)
-  }
+  query = query.range(from, to)
 
-  const { data, error } = await query
+  const { data, count, error } = await query
 
   if (error) {
     console.error('[Account Service] 查詢交易歷史失敗:', error)
-    return { data: null, error }
+    return { data: null, count: 0, error }
   }
 
-  return { data, error: null }
+  return { data, count, error: null }
 }

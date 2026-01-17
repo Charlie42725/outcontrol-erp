@@ -2,6 +2,15 @@
 
 import React, { useState, useEffect } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import Link from 'next/link'
+import { MoreHorizontal, Edit, Trash2, FileText } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
 
 type Account = {
   id: string
@@ -324,30 +333,45 @@ export default function AccountsPage() {
                             </td>
                             <td className="px-6 py-4 text-center text-sm">
                               <span
-                                className={`inline-block rounded px-2 py-1 text-xs font-medium ${
-                                  account.is_active
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}
+                                className={`inline-block rounded px-2 py-1 text-xs font-medium ${account.is_active
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-100 text-gray-800'
+                                  }`}
                               >
                                 {account.is_active ? '啟用' : '停用'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-center text-sm">
-                              <div className="flex items-center justify-center gap-2">
-                                <button
-                                  onClick={() => handleEdit(account)}
-                                  className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700"
-                                >
-                                  編輯
-                                </button>
-                                <button
-                                  onClick={() => handleDelete(account.id, account.account_name)}
-                                  className="rounded bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
-                                >
-                                  刪除
-                                </button>
-                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <Link href={`/accounts/${account.id}`} className="w-full">
+                                    <DropdownMenuItem className="cursor-pointer">
+                                      <FileText className="mr-2 h-4 w-4" />
+                                      查看明細
+                                    </DropdownMenuItem>
+                                  </Link>
+                                  <DropdownMenuItem
+                                    onClick={() => handleEdit(account)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    編輯
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleDelete(account.id, account.account_name)}
+                                    className="cursor-pointer text-red-600 focus:text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    刪除
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </td>
                           </tr>
                         ))}
@@ -363,3 +387,4 @@ export default function AccountsPage() {
     </div>
   )
 }
+
