@@ -439,8 +439,24 @@ export default function PurchasesPage() {
                                         const remainingQty = item.quantity - (item.received_quantity || 0)
                                         return (
                                           <tr key={item.id}>
-                                            <td className="py-2 text-sm text-gray-900 dark:text-gray-100">{item.products.item_code}</td>
-                                            <td className="py-2 text-sm text-gray-900 dark:text-gray-100">{item.products.name}</td>
+                                            <td className="py-2 text-sm text-gray-900 dark:text-gray-100">
+                                              <Link
+                                                href={`/products/${item.product_id}/edit`}
+                                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                {item.products.item_code}
+                                              </Link>
+                                            </td>
+                                            <td className="py-2 text-sm text-gray-900 dark:text-gray-100">
+                                              <Link
+                                                href={`/products/${item.product_id}/edit`}
+                                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                {item.products.name}
+                                              </Link>
+                                            </td>
                                             <td className="py-2 text-right text-sm text-gray-900 dark:text-gray-100">
                                               {item.quantity} {item.products.unit}
                                             </td>
