@@ -150,9 +150,9 @@ export async function POST(request: NextRequest) {
         .single()
 
       let nextNum = 1
-      if (lastPurchase?.purchase_no) {
+      if (lastPurchase && (lastPurchase as any).purchase_no) {
         // Extract number from P0001 format
-        const match = lastPurchase.purchase_no.match(/P(\d+)/)
+        const match = (lastPurchase as any).purchase_no.match(/P(\d+)/)
         if (match) {
           nextNum = parseInt(match[1], 10) + 1
         }

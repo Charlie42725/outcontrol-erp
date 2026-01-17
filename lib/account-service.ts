@@ -17,6 +17,7 @@ export interface AccountUpdateParams {
   referenceId: string                // 關聯記錄 ID
   referenceNo?: string               // 關聯單號
   note?: string
+  date?: string                      // 交易日期 (ISO string or YYYY-MM-DD)
 }
 
 /**
