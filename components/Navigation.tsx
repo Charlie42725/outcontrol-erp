@@ -35,7 +35,7 @@ const navItems: NavItem[] = [
       { href: '/customers', label: '客戶管理', roles: ['admin'] },
     ],
   },
-  { href: '/sales', label: '銷售記錄', roles: ['admin'] },
+  { href: '/sales', label: '銷售記錄', roles: ['admin', 'staff'] },
   { href: '/purchases', label: '進貨管理', roles: ['admin', 'staff'] },
   {
     label: '財務管理',
