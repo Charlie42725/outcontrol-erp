@@ -137,11 +137,10 @@ export default function MobilePOS({
         )
         if (matchedProduct) {
             addToCart(matchedProduct, 1)
-            setScanToast({ type: 'success', text: `✓ 已加入: ${matchedProduct.name}` })
-            // 不自動關閉，可以繼續掃描
+            setShowCameraScanner(false) // 掃描成功後自動關閉
         } else {
-            setScanToast({ type: 'error', text: `找不到條碼: ${code}` })
             setSearchQuery(code)
+            setShowCameraScanner(false) // 找不到也關閉，讓用戶手動搜尋
         }
     }
 
