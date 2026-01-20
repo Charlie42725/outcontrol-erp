@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { formatCurrency } from '@/lib/utils'
 import type { Product, PaymentMethod } from '@/types'
@@ -119,6 +119,17 @@ export default function MobilePOS({
         }, 100)
     }
 
+    // 掃描提示訊息
+    const [scanToast, setScanToast] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+    // 清除掃描提示
+    useEffect(() => {
+        if (scanToast) {
+            const timer = setTimeout(() => setScanToast(null), 2000)
+            return () => clearTimeout(timer)
+        }
+    }, [scanToast])
+
     // 相機掃描結果
     const handleCameraScan = (code: string) => {
         const matchedProduct = products.find(
@@ -126,9 +137,11 @@ export default function MobilePOS({
         )
         if (matchedProduct) {
             addToCart(matchedProduct, 1)
+            setScanToast({ type: 'success', text: `✓ 已加入: ${matchedProduct.name}` })
+            // 不自動關閉，可以繼續掃描
         } else {
+            setScanToast({ type: 'error', text: `找不到條碼: ${code}` })
             setSearchQuery(code)
-            alert(`找不到條碼 "${code}" 對應的商品`)
         }
     }
 

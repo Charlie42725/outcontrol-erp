@@ -436,9 +436,8 @@ export default function POSPage() {
     if (matchedProduct) {
       addToCart(matchedProduct, 1)
     } else {
-      // 找不到商品，把條碼填入搜尋框
+      // 找不到商品，把條碼填入搜尋框讓用戶嘗試文字搜尋
       setSearchQuery(code)
-      alert(`找不到條碼 "${code}" 對應的商品`)
     }
   }
 
