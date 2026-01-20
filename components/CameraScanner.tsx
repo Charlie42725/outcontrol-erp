@@ -103,15 +103,11 @@ export default function CameraScanner({ isOpen, onClose, onScan }: CameraScanner
     }
 
     const handleScanSuccess = useCallback((code: string) => {
-        // 防止短時間內重複掃描同一個條碼
+        // 防止重複觸發（使用 ref 確保立即生效）
         if (scanCooldownRef.current) return
-        if (lastScannedCode === code) return
 
-        // 設定冷卻期 (1秒)
+        // 立即設定冷卻，防止任何重複呼叫
         scanCooldownRef.current = true
-        setTimeout(() => {
-            scanCooldownRef.current = false
-        }, 1000)
 
         setLastScannedCode(code)
 
@@ -120,9 +116,14 @@ export default function CameraScanner({ isOpen, onClose, onScan }: CameraScanner
             navigator.vibrate(100)
         }
 
-        // 回傳掃描結果 - 不自動關閉，讓父組件處理
+        // 回傳掃描結果
         onScan(code)
-    }, [lastScannedCode, onScan])
+
+        // 冷卻期結束後才允許下次掃描（5秒）
+        setTimeout(() => {
+            scanCooldownRef.current = false
+        }, 5000)
+    }, [onScan])
 
     const stopScanner = async () => {
         if (scannerRef.current) {
@@ -195,8 +196,8 @@ export default function CameraScanner({ isOpen, onClose, onScan }: CameraScanner
                     {/* 掃描結果訊息 */}
                     {scanMessage && (
                         <div className={`absolute bottom-4 left-4 right-4 p-3 rounded-lg text-center ${scanMessage.type === 'success'
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-red-600 text-white'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-red-600 text-white'
                             }`}>
                             {scanMessage.text}
                         </div>
