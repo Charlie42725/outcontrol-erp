@@ -11,6 +11,12 @@ const CameraScanner = dynamic(() => import('@/components/CameraScanner'), {
   loading: () => null,
 })
 
+// 動態載入手機版 POS
+const MobilePOS = dynamic(() => import('@/components/MobilePOS'), {
+  ssr: false,
+  loading: () => null,
+})
+
 type CartItem = SaleItem & {
   product: Product
   ichiban_kuji_prize_id?: string
@@ -156,6 +162,15 @@ export default function POSPage() {
   const [showClosingModal, setShowClosingModal] = useState(false)
   const [closingNote, setClosingNote] = useState('')
   const [closingInProgress, setClosingInProgress] = useState(false)
+
+  // 手機版檢測
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   useEffect(() => {
     fetchCustomers()
@@ -976,6 +991,38 @@ export default function POSPage() {
     c.customer_code.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
     c.phone?.toLowerCase().includes(customerSearchQuery.toLowerCase())
   )
+
+  // 手機版渲染
+  if (isMobile) {
+    return (
+      <MobilePOS
+        cart={cart}
+        setCart={setCart}
+        products={products}
+        customers={customers}
+        selectedCustomer={selectedCustomer}
+        setSelectedCustomer={setSelectedCustomer}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        isPaid={isPaid}
+        setIsPaid={setIsPaid}
+        isDelivered={isDelivered}
+        setIsDelivered={setIsDelivered}
+        loading={loading}
+        error={error}
+        finalTotal={finalTotal}
+        discountAmount={discountAmount}
+        storeCreditUsed={storeCreditUsed}
+        handleCheckout={handleCheckout}
+        addToCart={addToCart}
+        removeFromCart={removeFromCart}
+        updateQuantity={updateQuantity}
+        toggleFreeGift={toggleFreeGift}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+      />
+    )
+  }
 
   return (
     <>
