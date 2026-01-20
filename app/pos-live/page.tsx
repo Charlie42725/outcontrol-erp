@@ -1,8 +1,15 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { formatCurrency } from '@/lib/utils'
 import type { Product, SaleItem, PaymentMethod } from '@/types'
+
+// 動態載入相機掃描元件（避免 SSR 問題）
+const CameraScanner = dynamic(() => import('@/components/CameraScanner'), {
+  ssr: false,
+  loading: () => null,
+})
 
 type CartItem = SaleItem & {
   product: Product
@@ -133,6 +140,9 @@ export default function POSPage() {
   const [selectedKuji, setSelectedKuji] = useState<any | null>(null)
   const [expandedKujiId, setExpandedKujiId] = useState<string | null>(null)
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // 相機掃描
+  const [showCameraScanner, setShowCameraScanner] = useState(false)
 
   // Quantity input modal
   const [showQuantityModal, setShowQuantityModal] = useState(false)
@@ -380,6 +390,22 @@ export default function POSPage() {
         },
       ]
     })
+  }
+
+  // 相機掃描結果處理
+  const handleCameraScan = (code: string) => {
+    // 在商品中搜尋條碼
+    const matchedProduct = products.find(
+      p => p.barcode && p.barcode.toLowerCase() === code.toLowerCase()
+    )
+
+    if (matchedProduct) {
+      addToCart(matchedProduct, 1)
+    } else {
+      // 找不到商品，把條碼填入搜尋框
+      setSearchQuery(code)
+      alert(`找不到條碼 "${code}" 對應的商品`)
+    }
   }
 
   const openQuantityModal = (product: Product) => {
@@ -1025,7 +1051,7 @@ export default function POSPage() {
 
             {inventoryMode === 'products' && (
               <>
-                <div className="mb-3">
+                <div className="mb-3 flex gap-2">
                   <input
                     type="text"
                     value={searchQuery}
@@ -1051,8 +1077,15 @@ export default function POSPage() {
                       }, 100)
                     }}
                     placeholder="🔍 掃描或搜尋商品..."
-                    className="w-full rounded-lg px-3 py-2.5 text-sm text-white bg-slate-700 border border-slate-600 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
+                    className="flex-1 rounded-lg px-3 py-2.5 text-sm text-white bg-slate-700 border border-slate-600 focus:border-indigo-500 focus:outline-none placeholder-slate-400"
                   />
+                  <button
+                    onClick={() => setShowCameraScanner(true)}
+                    className="px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                    title="相機掃描"
+                  >
+                    📷
+                  </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -2209,6 +2242,13 @@ export default function POSPage() {
           </div>
         )}
       </div>
+
+      {/* 相機掃描 Modal */}
+      <CameraScanner
+        isOpen={showCameraScanner}
+        onClose={() => setShowCameraScanner(false)}
+        onScan={handleCameraScan}
+      />
     </>
   )
 }
