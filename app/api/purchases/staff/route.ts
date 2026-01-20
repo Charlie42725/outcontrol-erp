@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
-import { generateCode } from '@/lib/utils'
 import { z } from 'zod'
 import { fromZodError } from 'zod-validation-error'
 import { getCurrentUser } from '@/lib/auth'
@@ -56,31 +55,70 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate purchase_no
-    const { count } = await supabaseServer
-      .from('purchases')
-      .select('*', { count: 'exact', head: true })
+    // Generate purchase_no with retry logic to handle unique constraint violations
+    let purchase: any = null
+    let purchaseError: any = null
+    let attempts = 0
+    const maxAttempts = 5
 
-    const purchaseNo = generateCode('P', count || 0)
+    while (attempts < maxAttempts) {
+      attempts++
 
-    // 1. Create purchase (status: pending for staff submission)
-    const { data: purchase, error: purchaseError } = await (supabaseServer
-      .from('purchases') as any)
-      .insert({
-        purchase_no: purchaseNo,
-        vendor_code: draft.vendor_code,
-        is_paid: false,  // Staff doesn't handle payment
-        note: `員工進貨申請 (by ${user.username})`,
-        status: 'pending',  // Pending approval from boss
-        total: 0,  // Will be calculated after boss adds cost
-        created_by: user.username,
-      })
-      .select()
-      .single()
+      // Get latest purchase_no to determine next number
+      const { data: lastPurchase } = await supabaseServer
+        .from('purchases')
+        .select('purchase_no')
+        .order('purchase_no', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-    if (purchaseError) {
+      let nextNum = 1
+      if (lastPurchase && (lastPurchase as any).purchase_no) {
+        const match = (lastPurchase as any).purchase_no.match(/P(\d+)/)
+        if (match) {
+          nextNum = parseInt(match[1], 10) + 1
+        }
+      }
+
+      // Add attempt number as additional offset to reduce collision chance on retry
+      if (attempts > 1) {
+        nextNum += attempts - 1
+      }
+
+      const purchaseNo = `P${nextNum.toString().padStart(4, '0')}`
+
+      // 1. Create purchase (status: pending for staff submission)
+      const result = await (supabaseServer
+        .from('purchases') as any)
+        .insert({
+          purchase_no: purchaseNo,
+          vendor_code: draft.vendor_code,
+          is_paid: false,  // Staff doesn't handle payment
+          note: `員工進貨申請 (by ${user.username})`,
+          status: 'pending',  // Pending approval from boss
+          total: 0,  // Will be calculated after boss adds cost
+          created_by: user.username,
+        })
+        .select()
+        .single()
+
+      if (result.error) {
+        // Check for unique violation (Postgres error 23505)
+        if (result.error.code === '23505' && result.error.message.includes('purchases_purchase_no_key')) {
+          console.warn(`[Staff Purchase] Purchase number collision: ${purchaseNo}. Retrying (${attempts}/${maxAttempts})...`)
+          continue // Retry with new number
+        }
+        purchaseError = result.error
+        break
+      }
+
+      purchase = result.data
+      break
+    }
+
+    if (!purchase || purchaseError) {
       return NextResponse.json(
-        { ok: false, error: purchaseError.message },
+        { ok: false, error: purchaseError?.message || '無法生成唯一進貨單號，請稍後再試' },
         { status: 500 }
       )
     }
