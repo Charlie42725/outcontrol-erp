@@ -137,6 +137,7 @@ export default function MobilePOS({
         )
         if (matchedProduct) {
             addToCart(matchedProduct, 1)
+            setSearchQuery('') // 清空搜尋框
             setShowCameraScanner(false) // 掃描成功後自動關閉
         } else {
             setSearchQuery(code)
