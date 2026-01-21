@@ -253,7 +253,7 @@ export default function PurchasesPage() {
                 type="text"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder="搜尋進貨單號或廠商代碼"
+                placeholder="搜尋進貨單號、廠商代碼或廠商名稱"
                 className="flex-1 rounded border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-900 dark:text-gray-100 dark:bg-gray-700 placeholder:text-gray-900 dark:placeholder:text-gray-400"
               />
             </div>

@@ -45,9 +45,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('vendor_code', vendorCode)
     }
 
-    if (keyword) {
-      query = query.or(`purchase_no.ilike.%${keyword}%,vendor_code.ilike.%${keyword}%`)
-    }
+    // keyword filtering moved to post-query for vendor_name support
 
     if (status) {
       query = query.eq('status', status)
@@ -62,10 +60,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Filter by product if needed
+    // Filter by keyword (purchase_no, vendor_code, vendor_name)
     let filteredData = data
+    if (keyword) {
+      const kw = keyword.toLowerCase()
+      filteredData = filteredData?.filter((purchase: any) =>
+        purchase.purchase_no?.toLowerCase().includes(kw) ||
+        purchase.vendor_code?.toLowerCase().includes(kw) ||
+        purchase.vendors?.vendor_name?.toLowerCase().includes(kw)
+      )
+    }
+
+    // Filter by product if needed
     if (productKeyword) {
-      filteredData = data?.filter((purchase: any) => {
+      filteredData = filteredData?.filter((purchase: any) => {
         const items = purchase.purchase_items || []
         return items.some((item: any) =>
           item.products?.name?.toLowerCase().includes(productKeyword.toLowerCase()) ||
