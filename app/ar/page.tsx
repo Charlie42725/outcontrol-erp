@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatCurrency, formatDate, formatPaymentMethod } from '@/lib/utils'
 
 type ARAccount = {
@@ -57,6 +58,8 @@ type CustomerGroup = {
 }
 
 export default function ARPageV2() {
+  const router = useRouter()
+  const [accessDenied, setAccessDenied] = useState(false)
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set())
@@ -69,6 +72,22 @@ export default function ARPageV2() {
   const [keyword, setKeyword] = useState('')
   const [currentCustomer, setCurrentCustomer] = useState<string | null>(null)
   const [updatingPayment, setUpdatingPayment] = useState<string | null>(null)
+
+  // 權限檢查
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.ok || data.data?.role !== 'admin') {
+          setAccessDenied(true)
+          setTimeout(() => router.push('/'), 2000)
+        }
+      })
+      .catch(() => {
+        setAccessDenied(true)
+        setTimeout(() => router.push('/'), 2000)
+      })
+  }, [router])
 
   // 新增：篩選狀態
   const [filterOverdue, setFilterOverdue] = useState(false)
@@ -448,6 +467,19 @@ export default function ARPageV2() {
 
   const totalUnpaid = customerGroups.reduce((sum, g) => sum + g.total_balance, 0)
   const totalCustomers = customerGroups.filter(g => g.unpaid_count > 0).length
+
+  // 權限不足時顯示提示
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🚫</div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">權限不足</h1>
+          <p className="text-gray-600 dark:text-gray-400">您沒有權限訪問此頁面，正在返回首頁...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">

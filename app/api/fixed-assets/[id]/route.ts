@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 
 // GET /api/fixed-assets/[id] - Get single fixed asset
 export async function GET(
@@ -7,6 +8,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // 只有管理員可以查看固定資產
+        await requireRole('admin')
+
         const { id } = await params
 
         const { data, error } = await (supabaseServer
@@ -31,6 +35,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // 只有管理員可以更新固定資產
+        await requireRole('admin')
+
         const { id } = await params
         const body = await request.json()
 
@@ -80,6 +87,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // 只有管理員可以刪除固定資產
+        await requireRole('admin')
+
         const { id } = await params
 
         const { error } = await (supabaseServer

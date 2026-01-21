@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 import { MoreHorizontal, Edit, Trash2 } from 'lucide-react'
 import {
@@ -58,6 +59,8 @@ const CATEGORY_OPTIONS = [
 ]
 
 export default function FixedAssetsPage() {
+    const router = useRouter()
+    const [accessDenied, setAccessDenied] = useState(false)
     const [assets, setAssets] = useState<FixedAsset[]>([])
     const [summary, setSummary] = useState<Summary | null>(null)
     const [loading, setLoading] = useState(true)
@@ -76,6 +79,22 @@ export default function FixedAssetsPage() {
         depreciation_start_date: '',
         note: '',
     })
+
+    // 權限檢查
+    useEffect(() => {
+        fetch('/api/auth/me')
+            .then(res => res.json())
+            .then(data => {
+                if (!data.ok || data.data?.role !== 'admin') {
+                    setAccessDenied(true)
+                    setTimeout(() => router.push('/'), 2000)
+                }
+            })
+            .catch(() => {
+                setAccessDenied(true)
+                setTimeout(() => router.push('/'), 2000)
+            })
+    }, [router])
 
     useEffect(() => {
         fetchAssets()
@@ -220,6 +239,19 @@ export default function FixedAssetsPage() {
         setShowForm(false)
         setEditingAsset(null)
         resetForm()
+    }
+
+    // 權限不足時顯示提示
+    if (accessDenied) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-6xl mb-4">🚫</div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">權限不足</h1>
+                    <p className="text-gray-600 dark:text-gray-400">您沒有權限訪問此頁面，正在返回首頁...</p>
+                </div>
+            </div>
+        )
     }
 
     return (

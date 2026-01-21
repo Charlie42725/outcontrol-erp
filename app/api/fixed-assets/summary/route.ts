@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 
 // GET /api/fixed-assets/summary - Get depreciation summary
 export async function GET(request: NextRequest) {
     try {
+        // 只有管理員可以查看固定資產摘要
+        await requireRole('admin')
+
         const searchParams = request.nextUrl.searchParams
         const month = searchParams.get('month') // format: YYYY-MM
 

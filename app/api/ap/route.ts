@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 
 // GET /api/ap - List accounts payable
 export async function GET(request: NextRequest) {
   try {
+    // 只有管理員可以查看應付帳款
+    await requireRole('admin')
+
     const searchParams = request.nextUrl.searchParams
     const vendorCode = searchParams.get('vendor_code')
     const status = searchParams.get('status')

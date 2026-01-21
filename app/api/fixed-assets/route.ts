@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth'
 
 // GET /api/fixed-assets - List all fixed assets
 export async function GET(request: NextRequest) {
     try {
+        // 只有管理員可以查看固定資產
+        await requireRole('admin')
+
         const searchParams = request.nextUrl.searchParams
         const category = searchParams.get('category')
         const status = searchParams.get('status')
@@ -69,6 +73,9 @@ export async function GET(request: NextRequest) {
 // POST /api/fixed-assets - Create new fixed asset
 export async function POST(request: NextRequest) {
     try {
+        // 只有管理員可以新增固定資產
+        await requireRole('admin')
+
         const body = await request.json()
         const {
             asset_name,
