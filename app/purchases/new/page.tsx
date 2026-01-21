@@ -29,6 +29,7 @@ export default function NewPurchasePage() {
   const [searching, setSearching] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [totalCostInput, setTotalCostInput] = useState<string>('')
 
   useEffect(() => {
     fetchVendors()
@@ -107,6 +108,43 @@ export default function NewPurchasePage() {
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index))
+  }
+
+  // 分配總成本：直接計算精確的單位成本
+  const distributeTotalCost = () => {
+    const inputCost = parseFloat(totalCostInput)
+    if (isNaN(inputCost) || inputCost <= 0) {
+      setError('請輸入有效的總成本金額')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+
+    if (items.length === 0) {
+      setError('請先新增商品')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+
+    // 計算總數量
+    const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0)
+
+    if (totalQuantity === 0) {
+      setError('商品總數量不能為零')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+
+    // 計算精確的單位成本（不做四捨五入，保持完整精度）
+    const costPerUnit = inputCost / totalQuantity
+
+    const updatedItems = items.map(item => ({
+      ...item,
+      cost: costPerUnit
+    }))
+
+    setItems(updatedItems)
+    setTotalCostInput('')
+    setError('')
   }
 
   const total = items.reduce((sum, item) => sum + item.quantity * item.cost, 0)
@@ -323,6 +361,39 @@ export default function NewPurchasePage() {
                     </tr>
                   </tfoot>
                 </table>
+              </div>
+            )}
+
+            {/* 總成本輸入區塊 */}
+            {items.length > 0 && (
+              <div className="mt-4 rounded-lg border border-dashed border-blue-300 bg-blue-50 p-4 dark:border-blue-700 dark:bg-blue-900/20">
+                <label className="mb-2 block text-sm font-medium text-blue-900 dark:text-blue-200">
+                  📦 輸入總成本（自動按數量比例分配）
+                </label>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                    <input
+                      type="number"
+                      value={totalCostInput}
+                      onChange={(e) => setTotalCostInput(e.target.value)}
+                      placeholder="輸入總採購成本"
+                      min="0"
+                      step="0.01"
+                      className="w-full rounded border border-blue-300 bg-white py-2 pl-8 pr-3 text-gray-900 placeholder:text-gray-400 dark:border-blue-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={distributeTotalCost}
+                    className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    分配成本
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                  💡 提示：輸入總採購金額後點擊「分配成本」，系統會按各商品數量比例自動計算單位成本
+                </p>
               </div>
             )}
           </div>
