@@ -142,7 +142,9 @@ export default function Navigation() {
                     {/* 下拉内容 - 使用 fixed 定位避免被裁切 */}
                     <div className="absolute left-0 top-full mt-1 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100]">
                       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1">
-                        {item.submenu.map((subItem) => (
+                        {item.submenu
+                          .filter(subItem => user && subItem.roles.includes(user.role))
+                          .map((subItem) => (
                           <Link
                             key={subItem.href}
                             href={subItem.href!}
@@ -277,7 +279,9 @@ export default function Navigation() {
                     </button>
                     {openSubmenu === item.label && (
                       <div className="mt-1.5 ml-4 flex flex-col gap-1.5">
-                        {item.submenu.map((subItem) => (
+                        {item.submenu
+                          .filter(subItem => user && subItem.roles.includes(user.role))
+                          .map((subItem) => (
                           <Link
                             key={subItem.href}
                             href={subItem.href!}
