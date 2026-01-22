@@ -7,9 +7,8 @@ type ImportRow = {
   商品名稱?: string
   條碼?: string
   售價?: number
-  成本?: number
-  庫存?: number
-  分類?: string
+  數量?: number
+  總成本?: number
 }
 
 type ValidationError = {
@@ -62,17 +61,15 @@ export default function ProductImportModal({
         商品名稱: '範例商品1',
         條碼: '4710000000001',
         售價: 100,
-        成本: 50,
-        庫存: 10,
-        分類: '玩具',
+        數量: 10,
+        總成本: 500,
       },
       {
         商品名稱: '範例商品2',
         條碼: '4710000000002',
         售價: 200,
-        成本: 100,
-        庫存: 5,
-        分類: '公仔',
+        數量: 5,
+        總成本: 500,
       },
     ]
 
@@ -85,9 +82,8 @@ export default function ProductImportModal({
       { wch: 20 }, // 商品名稱
       { wch: 15 }, // 條碼
       { wch: 10 }, // 售價
-      { wch: 10 }, // 成本
-      { wch: 10 }, // 庫存
-      { wch: 10 }, // 分類
+      { wch: 10 }, // 數量
+      { wch: 10 }, // 總成本
     ]
 
     XLSX.writeFile(wb, '商品匯入範本.xlsx')
@@ -139,18 +135,18 @@ export default function ProductImportModal({
         // Validate numeric fields
         if (!hasError) {
           const price = Number(row.售價)
-          const cost = Number(row.成本)
-          const stock = Number(row.庫存)
+          const quantity = Number(row.數量)
+          const totalCost = Number(row.總成本)
 
           if (row.售價 !== undefined && (isNaN(price) || price < 0)) {
             hasError = true
             errorMessage = '售價必須為非負數'
-          } else if (row.成本 !== undefined && (isNaN(cost) || cost < 0)) {
+          } else if (row.數量 !== undefined && (isNaN(quantity) || quantity < 0)) {
             hasError = true
-            errorMessage = '成本必須為非負數'
-          } else if (row.庫存 !== undefined && (isNaN(stock) || stock < 0)) {
+            errorMessage = '數量必須為非負數'
+          } else if (row.總成本 !== undefined && (isNaN(totalCost) || totalCost < 0)) {
             hasError = true
-            errorMessage = '庫存必須為非負數'
+            errorMessage = '總成本必須為非負數'
           }
         }
 
@@ -396,9 +392,8 @@ export default function ProductImportModal({
                         <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">商品名稱</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">條碼</th>
                         <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">售價</th>
-                        <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">成本</th>
-                        <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">庫存</th>
-                        <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">分類</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">數量</th>
+                        <th className="px-3 py-2 text-right font-medium text-gray-700 dark:text-gray-300">總成本</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">狀態</th>
                       </tr>
                     </thead>
@@ -412,9 +407,8 @@ export default function ProductImportModal({
                           <td className="px-3 py-2 text-gray-900 dark:text-white">{row.商品名稱 || '-'}</td>
                           <td className="px-3 py-2 text-gray-900 dark:text-white">{row.條碼 || '-'}</td>
                           <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{row.售價 ?? 0}</td>
-                          <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{row.成本 ?? 0}</td>
-                          <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{row.庫存 ?? 0}</td>
-                          <td className="px-3 py-2 text-gray-900 dark:text-white">{row.分類 || '-'}</td>
+                          <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{row.數量 ?? 0}</td>
+                          <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{row.總成本 ?? 0}</td>
                           <td className="px-3 py-2">
                             {row.hasError ? (
                               <span className="text-red-600 dark:text-red-400 text-xs">

@@ -7,9 +7,8 @@ type ImportRow = {
   商品名稱?: string
   條碼?: string
   售價?: number
-  成本?: number
-  庫存?: number
-  分類?: string
+  數量?: number
+  總成本?: number
 }
 
 type ValidationError = {
@@ -122,8 +121,8 @@ export async function POST(request: NextRequest) {
 
       // Validate numeric fields
       const price = Number(row.售價) || 0
-      const cost = Number(row.成本) || 0
-      const stock = Number(row.庫存) || 0
+      const quantity = Number(row.數量) || 0
+      const totalCost = Number(row.總成本) || 0
 
       if (price < 0) {
         errors.push({
@@ -134,20 +133,20 @@ export async function POST(request: NextRequest) {
         return
       }
 
-      if (cost < 0) {
+      if (quantity < 0) {
         errors.push({
           row: rowNum,
-          field: '成本',
-          message: '成本不能為負數'
+          field: '數量',
+          message: '數量不能為負數'
         })
         return
       }
 
-      if (stock < 0) {
+      if (totalCost < 0) {
         errors.push({
           row: rowNum,
-          field: '庫存',
-          message: '庫存不能為負數'
+          field: '總成本',
+          message: '總成本不能為負數'
         })
         return
       }
@@ -189,19 +188,21 @@ export async function POST(request: NextRequest) {
     // Prepare products for insertion
     const productsToInsert = validRows.map((row, index) => {
       const itemCode = generateCode('I', maxNumber + index)
-      const cost = Number(row.成本) || 0
-      const stock = Number(row.庫存) || 0
+      const quantity = Number(row.數量) || 0
+      const totalCost = Number(row.總成本) || 0
+      // 計算單位成本：總成本 / 數量
+      const unitCost = quantity > 0 ? totalCost / quantity : 0
 
       return {
         item_code: itemCode,
         name: String(row.商品名稱).trim(),
         barcode: String(row.條碼).trim(),
         price: Number(row.售價) || 0,
-        cost: cost,
-        stock: stock,
-        avg_cost: stock > 0 ? cost : 0,
+        cost: unitCost,
+        stock: quantity,
+        avg_cost: quantity > 0 ? unitCost : 0,
         unit: '件',
-        tags: row.分類 ? [String(row.分類).trim()] : [],
+        tags: [],
         allow_negative: true,
         is_active: true,
       }
