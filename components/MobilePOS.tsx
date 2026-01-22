@@ -18,6 +18,7 @@ type CartItem = {
     ichiban_kuji_prize_id?: string
     ichiban_kuji_id?: string
     isFreeGift?: boolean
+    isNotDelivered?: boolean
 }
 
 type Customer = {
@@ -54,8 +55,6 @@ type MobilePOSProps = {
     setPaymentMethod: (p: PaymentMethod) => void
     isPaid: boolean
     setIsPaid: (b: boolean) => void
-    isDelivered: boolean
-    setIsDelivered: (b: boolean) => void
     loading: boolean
     error: string
     finalTotal: number
@@ -66,6 +65,7 @@ type MobilePOSProps = {
     removeFromCart: (productId: string, index?: number) => void
     updateQuantity: (productId: string, quantity: number) => void
     toggleFreeGift: (index: number) => void
+    toggleNotDelivered: (index: number) => void
     searchQuery: string
     setSearchQuery: (q: string) => void
     // 暫存功能
@@ -86,8 +86,6 @@ export default function MobilePOS({
     setPaymentMethod,
     isPaid,
     setIsPaid,
-    isDelivered,
-    setIsDelivered,
     loading,
     error,
     finalTotal,
@@ -98,6 +96,7 @@ export default function MobilePOS({
     removeFromCart,
     updateQuantity,
     toggleFreeGift,
+    toggleNotDelivered,
     searchQuery,
     setSearchQuery,
     drafts,
@@ -294,17 +293,28 @@ export default function MobilePOS({
                                     </button>
                                 </div>
                             </div>
-                            {!item.ichiban_kuji_prize_id && (
-                                <button
-                                    onClick={() => toggleFreeGift(index)}
-                                    className={`mt-2 text-xs px-2 py-1 rounded ${item.isFreeGift
-                                        ? 'bg-emerald-600 text-white'
-                                        : 'bg-slate-700 text-slate-400'
-                                        }`}
-                                >
-                                    {item.isFreeGift ? '取消贈品' : '設為贈品'}
-                                </button>
-                            )}
+                            <div className="flex items-center gap-3 mt-2">
+                                {!item.ichiban_kuji_prize_id && (
+                                    <label className="flex items-center gap-1 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={item.isFreeGift || false}
+                                            onChange={() => toggleFreeGift(index)}
+                                            className="w-3 h-3 accent-emerald-500"
+                                        />
+                                        <span className="text-xs text-slate-400">贈品</span>
+                                    </label>
+                                )}
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={item.isNotDelivered || false}
+                                        onChange={() => toggleNotDelivered(index)}
+                                        className="w-3 h-3 accent-orange-500"
+                                    />
+                                    <span className="text-xs text-slate-400">未出貨</span>
+                                </label>
+                            </div>
                         </div>
                     ))
                 )}
@@ -341,15 +351,11 @@ export default function MobilePOS({
                         />
                         <span className="text-sm text-white">已收款</span>
                     </label>
-                    <label className="flex-1 flex items-center gap-2 cursor-pointer bg-slate-700 rounded-lg px-3 py-2">
-                        <input
-                            type="checkbox"
-                            checked={isDelivered}
-                            onChange={(e) => setIsDelivered(e.target.checked)}
-                            className="w-4 h-4 accent-indigo-500"
-                        />
-                        <span className="text-sm text-white">已出貨</span>
-                    </label>
+                    {cart.some(item => item.isNotDelivered) && (
+                        <div className="flex-1 flex items-center gap-2 bg-orange-600 rounded-lg px-3 py-2">
+                            <span className="text-sm text-white">有未出貨商品</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* 折扣資訊 */}

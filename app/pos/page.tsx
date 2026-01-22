@@ -22,6 +22,7 @@ type CartItem = SaleItem & {
   ichiban_kuji_prize_id?: string
   ichiban_kuji_id?: string
   isFreeGift?: boolean
+  isNotDelivered?: boolean
 }
 
 type Customer = {
@@ -546,6 +547,20 @@ export default function POSPage() {
     )
   }
 
+  const toggleNotDelivered = (index: number) => {
+    setCart((prev) =>
+      prev.map((item, i) => {
+        if (i === index) {
+          return {
+            ...item,
+            isNotDelivered: !item.isNotDelivered,
+          }
+        }
+        return item
+      })
+    )
+  }
+
   const removeFromCart = (productId: string, index?: number) => {
     setCart((prev) => {
       if (index !== undefined) {
@@ -743,6 +758,10 @@ export default function POSPage() {
       // Use combo price adjusted cart for checkout
       const checkoutCart = applyComboPrice()
 
+      // 檢查購物車中是否有未出貨的商品
+      const hasNotDeliveredItems = cart.some(item => item.isNotDelivered)
+      const finalIsDelivered = !hasNotDeliveredItems
+
       const res = await fetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -751,10 +770,10 @@ export default function POSPage() {
           source: salesMode,
           payment_method: paymentMethod,
           is_paid: isPaid,
-          is_delivered: isDelivered,
-          delivery_method: !isDelivered ? deliveryMethod : undefined,
-          expected_delivery_date: !isDelivered ? expectedDeliveryDate : undefined,
-          delivery_note: !isDelivered ? deliveryNote : undefined,
+          is_delivered: finalIsDelivered,
+          delivery_method: !finalIsDelivered ? deliveryMethod : undefined,
+          expected_delivery_date: !finalIsDelivered ? expectedDeliveryDate : undefined,
+          delivery_note: !finalIsDelivered ? deliveryNote : undefined,
           note: note || undefined,
           discount_type: discountType,
           discount_value: discountValue,
@@ -1045,8 +1064,6 @@ export default function POSPage() {
         setPaymentMethod={setPaymentMethod}
         isPaid={isPaid}
         setIsPaid={setIsPaid}
-        isDelivered={isDelivered}
-        setIsDelivered={setIsDelivered}
         loading={loading}
         error={error}
         finalTotal={finalTotal}
@@ -1057,6 +1074,7 @@ export default function POSPage() {
         removeFromCart={removeFromCart}
         updateQuantity={updateQuantity}
         toggleFreeGift={toggleFreeGift}
+        toggleNotDelivered={toggleNotDelivered}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         drafts={drafts}
@@ -1417,6 +1435,9 @@ export default function POSPage() {
                             {cart[item.indices![0]]?.isFreeGift && (
                               <span className="ml-2 text-xs bg-red-500 text-white px-2 py-0.5 rounded">贈品</span>
                             )}
+                            {cart[item.indices![0]]?.isNotDelivered && (
+                              <span className="ml-2 text-xs bg-orange-500 text-white px-2 py-0.5 rounded">未出貨</span>
+                            )}
                           </div>
                           <div className="text-xs text-gray-600 dark:text-gray-400">
                             {hasComboDiscount && (
@@ -1425,17 +1446,28 @@ export default function POSPage() {
                             {formatCurrency(item.price)}
                             {isGrouped && <span className="ml-2">× {item.quantity} 抽</span>}
                           </div>
-                          {!item.ichiban_kuji_id && (
-                            <label className="flex items-center gap-1 mt-1 cursor-pointer">
+                          <div className="flex items-center gap-3 mt-1">
+                            {!item.ichiban_kuji_id && (
+                              <label className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={cart[item.indices![0]]?.isFreeGift || false}
+                                  onChange={() => toggleFreeGift(item.indices![0])}
+                                  className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-xs text-gray-600 dark:text-gray-400">贈品</span>
+                              </label>
+                            )}
+                            <label className="flex items-center gap-1 cursor-pointer">
                               <input
                                 type="checkbox"
-                                checked={cart[item.indices![0]]?.isFreeGift || false}
-                                onChange={() => toggleFreeGift(item.indices![0])}
-                                className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                checked={cart[item.indices![0]]?.isNotDelivered || false}
+                                onChange={() => toggleNotDelivered(item.indices![0])}
+                                className="w-3 h-3 rounded border-gray-300 text-orange-500 focus:ring-orange-500 accent-orange-500"
                               />
-                              <span className="text-xs text-gray-600 dark:text-gray-400">贈品</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">未出貨</span>
                             </label>
-                          )}
+                          </div>
                         </div>
                         <button
                           onClick={() => {
@@ -2022,7 +2054,7 @@ export default function POSPage() {
                 )}
               </div>
 
-              {/* Payment Status + Delivery Status - 同一排 */}
+              {/* Payment Status */}
               <div className="flex gap-2">
                 <label className="flex-1 flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2.5 bg-slate-700 hover:bg-slate-600">
                   <input
@@ -2033,20 +2065,16 @@ export default function POSPage() {
                   />
                   <span className="text-sm text-white">已收款</span>
                 </label>
-                <label className="flex-1 flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2.5 bg-slate-700 hover:bg-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={isDelivered}
-                    onChange={(e) => setIsDelivered(e.target.checked)}
-                    className="w-4 h-4 accent-indigo-500"
-                  />
-                  <span className="text-sm text-white">已出貨</span>
-                </label>
+                {cart.some(item => item.isNotDelivered) && (
+                  <div className="flex-1 flex items-center gap-2 rounded-lg px-3 py-2.5 bg-orange-600">
+                    <span className="text-sm text-white">有未出貨商品</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Delivery Details - Only when not delivered */}
-            {!isDelivered && (
+            {/* Delivery Details - Only when has not delivered items */}
+            {cart.some(item => item.isNotDelivered) && (
               <div className="space-y-2 border-2 border-orange-400 dark:border-orange-600 rounded-lg p-3 bg-orange-50 dark:bg-orange-900/20">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">預計出貨日</label>

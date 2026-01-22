@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
+import ProductImportModal from '@/components/ProductImportModal'
 
 type SortField = 'item_code' | 'name' | 'price' | 'avg_cost' | 'stock' | 'updated_at'
 type SortOrder = 'asc' | 'desc'
@@ -30,6 +31,7 @@ export default function ProductsPage() {
   const [loadingLowStock, setLoadingLowStock] = useState(true)
   const [showLowStock, setShowLowStock] = useState(false)
   const [userRole, setUserRole] = useState<'admin' | 'staff' | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   // 獲取用戶角色
   useEffect(() => {
@@ -193,6 +195,12 @@ export default function ProductsPage() {
             >
               打印條碼
             </Link>
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700"
+            >
+              匯入
+            </button>
             <Link
               href="/products/new"
               className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
@@ -593,6 +601,16 @@ export default function ProductsPage() {
         </>,
         document.body
       )}
+
+      {/* Import Modal */}
+      <ProductImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          fetchProducts(1)
+          setPage(1)
+        }}
+      />
     </div>
   )
 }
