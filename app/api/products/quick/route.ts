@@ -8,6 +8,8 @@ import { fromZodError } from 'zod-validation-error'
 const quickProductSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   barcode: z.string().optional().nullable(),
+  cost: z.number().min(0).optional(),  // 進貨時可以直接填成本
+  price: z.number().min(0).optional(), // 可選填售價
 })
 
 // POST /api/products/quick - Quick create product for staff (minimal info)
@@ -66,17 +68,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert product with minimal info (cost and price will be filled by boss later)
+    // Insert product with minimal info (cost and price can be filled now or by boss later)
     const insertData = {
       item_code,
       name: data.name,
       barcode: data.barcode || null,
-      price: 0,  // Boss will fill later
-      cost: 0,   // Boss will fill later
+      price: data.price || 0,
+      cost: data.cost || 0,
       unit: '件',
       tags: [],
       stock: 0,
-      avg_cost: 0,
+      avg_cost: data.cost || 0,  // 初始平均成本等於進貨成本
       allow_negative: true,
       is_active: true,
     }

@@ -31,6 +31,13 @@ export default function NewPurchasePage() {
   const [error, setError] = useState('')
   const [totalCostInput, setTotalCostInput] = useState<string>('')
 
+  // 快速新增商品 Modal
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickAddName, setQuickAddName] = useState('')
+  const [quickAddBarcode, setQuickAddBarcode] = useState('')
+  const [quickAddCost, setQuickAddCost] = useState('')
+  const [quickAddLoading, setQuickAddLoading] = useState(false)
+
   useEffect(() => {
     fetchVendors()
   }, [])
@@ -108,6 +115,68 @@ export default function NewPurchasePage() {
 
   const removeItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index))
+  }
+
+  // 開啟快速新增商品 Modal（預填搜尋關鍵字作為商品名稱）
+  const openQuickAdd = () => {
+    setQuickAddName(searchKeyword)
+    setQuickAddBarcode('')
+    setQuickAddCost('')
+    setShowQuickAdd(true)
+  }
+
+  // 快速新增商品
+  const handleQuickAdd = async () => {
+    if (!quickAddName.trim()) {
+      setError('請輸入商品名稱')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+
+    setQuickAddLoading(true)
+    try {
+      const cost = parseFloat(quickAddCost) || 0
+      const res = await fetch('/api/products/quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: quickAddName.trim(),
+          barcode: quickAddBarcode.trim() || null,
+          cost: cost,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (data.ok && data.data) {
+        // 新增成功，直接加入進貨清單
+        const newProduct = data.data as Product
+        setItems([
+          ...items,
+          {
+            product_id: newProduct.id,
+            product: newProduct,
+            quantity: 1,
+            cost: cost,
+          },
+        ])
+        // 關閉 Modal 並清空
+        setShowQuickAdd(false)
+        setQuickAddName('')
+        setQuickAddBarcode('')
+        setQuickAddCost('')
+        setSearchKeyword('')
+        setSearchResults([])
+      } else {
+        setError(data.error || '新增商品失敗')
+        setTimeout(() => setError(''), 3000)
+      }
+    } catch (err) {
+      setError('新增商品失敗')
+      setTimeout(() => setError(''), 3000)
+    } finally {
+      setQuickAddLoading(false)
+    }
   }
 
   // 分配總成本：直接計算精確的單位成本
@@ -260,8 +329,17 @@ export default function NewPurchasePage() {
             )}
 
             {!searching && searchKeyword && searchResults.length === 0 && (
-              <div className="mt-2 rounded border border-gray-200 bg-yellow-50 p-3 text-center text-sm text-gray-900 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-                找不到商品，請確認商品是否存在
+              <div className="mt-2 rounded border border-gray-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20">
+                <p className="text-center text-sm text-gray-900 dark:text-yellow-400">
+                  找不到「{searchKeyword}」
+                </p>
+                <button
+                  type="button"
+                  onClick={openQuickAdd}
+                  className="mt-2 w-full rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 transition-colors"
+                >
+                  ➕ 快速新增商品
+                </button>
               </div>
             )}
 
@@ -417,6 +495,79 @@ export default function NewPurchasePage() {
           </div>
         </form>
       </div>
+
+      {/* 快速新增商品 Modal */}
+      {showQuickAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-gray-800">
+            <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+              快速新增商品
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  商品名稱 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={quickAddName}
+                  onChange={(e) => setQuickAddName(e.target.value)}
+                  placeholder="輸入商品名稱"
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  條碼（選填）
+                </label>
+                <input
+                  type="text"
+                  value={quickAddBarcode}
+                  onChange={(e) => setQuickAddBarcode(e.target.value)}
+                  placeholder="輸入條碼"
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  進貨成本
+                </label>
+                <input
+                  type="number"
+                  value={quickAddCost}
+                  onChange={(e) => setQuickAddCost(e.target.value)}
+                  placeholder="0"
+                  min="0"
+                  step="0.01"
+                  className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowQuickAdd(false)}
+                className="flex-1 rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleQuickAdd}
+                disabled={quickAddLoading || !quickAddName.trim()}
+                className="flex-1 rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600"
+              >
+                {quickAddLoading ? '新增中...' : '新增並加入'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
