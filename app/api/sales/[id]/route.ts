@@ -115,7 +115,9 @@ export async function PATCH(
     const newAccountId = account?.id || null
 
     // 3. 如果帳戶有變更，處理餘額轉移
-    if (oldAccountId !== newAccountId) {
+    // 🔧 修正：只有當舊帳戶存在時才處理轉移
+    // 避免補記歷史銷售單的帳戶交易（當初創建時因 payment_method_code 未設定而沒有記帳）
+    if (oldAccountId && oldAccountId !== newAccountId) {
       // 3.1 還原舊帳戶餘額
       if (oldAccountId) {
         // 刪除舊的 account_transactions
