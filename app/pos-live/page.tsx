@@ -22,6 +22,7 @@ type CartItem = SaleItem & {
   ichiban_kuji_prize_id?: string
   ichiban_kuji_id?: string
   isFreeGift?: boolean
+  isNotDelivered?: boolean
 }
 
 type Customer = {
@@ -527,6 +528,20 @@ export default function POSPage() {
     )
   }
 
+  const toggleNotDelivered = (index: number) => {
+    setCart((prev) =>
+      prev.map((item, i) => {
+        if (i === index) {
+          return {
+            ...item,
+            isNotDelivered: !item.isNotDelivered,
+          }
+        }
+        return item
+      })
+    )
+  }
+
   const removeFromCart = (productId: string, index?: number) => {
     setCart((prev) => {
       if (index !== undefined) {
@@ -1017,6 +1032,7 @@ export default function POSPage() {
         removeFromCart={removeFromCart}
         updateQuantity={updateQuantity}
         toggleFreeGift={toggleFreeGift}
+        toggleNotDelivered={toggleNotDelivered}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         drafts={drafts}

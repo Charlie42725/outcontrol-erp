@@ -142,13 +142,13 @@ export default function ProductImportModal({
           const cost = Number(row.成本)
           const stock = Number(row.庫存)
 
-          if (row.售價 !== undefined && row.售價 !== '' && (isNaN(price) || price < 0)) {
+          if (row.售價 !== undefined && (isNaN(price) || price < 0)) {
             hasError = true
             errorMessage = '售價必須為非負數'
-          } else if (row.成本 !== undefined && row.成本 !== '' && (isNaN(cost) || cost < 0)) {
+          } else if (row.成本 !== undefined && (isNaN(cost) || cost < 0)) {
             hasError = true
             errorMessage = '成本必須為非負數'
-          } else if (row.庫存 !== undefined && row.庫存 !== '' && (isNaN(stock) || stock < 0)) {
+          } else if (row.庫存 !== undefined && (isNaN(stock) || stock < 0)) {
             hasError = true
             errorMessage = '庫存必須為非負數'
           }
