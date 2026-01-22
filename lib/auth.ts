@@ -121,13 +121,14 @@ export function hasPermission(user: User | null, resource: string): boolean {
     '/expenses',
     '/purchases',           // View purchases list
     '/purchases/staff',     // Staff quick purchase entry
+    '/customers',           // Customer management
     '/api/sales',
     '/api/expenses',
     '/api/purchases',       // View purchases API
     '/api/purchases/staff', // Staff submit purchase API
     '/api/products',        // Search products
     '/api/products/quick',  // Quick create product API
-    '/api/customers',
+    '/api/customers',       // Customer API
     '/api/sale-drafts',
     '/api/ichiban-kuji',
   ]

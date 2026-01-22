@@ -1059,6 +1059,10 @@ export default function POSPage() {
         toggleFreeGift={toggleFreeGift}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        drafts={drafts}
+        handleSaveDraft={handleSaveDraft}
+        handleLoadDraft={handleLoadDraft}
+        handleDeleteDraft={handleDeleteDraft}
       />
     )
   }

@@ -30,6 +30,19 @@ type Customer = {
     credit_limit: number
 }
 
+type SaleDraft = {
+    id: string
+    customer_code: string | null
+    payment_method: PaymentMethod
+    is_paid: boolean
+    note: string | null
+    discount_type: 'none' | 'percent' | 'amount'
+    discount_value: number
+    items: CartItem[]
+    created_at: string
+    customers?: { customer_name: string }
+}
+
 type MobilePOSProps = {
     cart: CartItem[]
     setCart: (cart: CartItem[] | ((prev: CartItem[]) => CartItem[])) => void
@@ -55,6 +68,11 @@ type MobilePOSProps = {
     toggleFreeGift: (index: number) => void
     searchQuery: string
     setSearchQuery: (q: string) => void
+    // 暫存功能
+    drafts: SaleDraft[]
+    handleSaveDraft: () => void
+    handleLoadDraft: (draft: SaleDraft) => void
+    handleDeleteDraft: (draftId: string) => void
 }
 
 export default function MobilePOS({
@@ -82,10 +100,15 @@ export default function MobilePOS({
     toggleFreeGift,
     searchQuery,
     setSearchQuery,
+    drafts,
+    handleSaveDraft,
+    handleLoadDraft,
+    handleDeleteDraft,
 }: MobilePOSProps) {
     const [showCameraScanner, setShowCameraScanner] = useState(false)
     const [showCustomerPicker, setShowCustomerPicker] = useState(false)
     const [showPaymentPicker, setShowPaymentPicker] = useState(false)
+    const [showDraftsPicker, setShowDraftsPicker] = useState(false)
     const [customerSearchQuery, setCustomerSearchQuery] = useState('')
     const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -156,7 +179,10 @@ export default function MobilePOS({
         { key: 'transfer_cathay', label: '🏦 國泰', paid: false },
         { key: 'transfer_fubon', label: '🏦 富邦', paid: false },
         { key: 'transfer_esun', label: '🏦 玉山', paid: false },
+        { key: 'transfer_union', label: '🏦 聯邦', paid: false },
         { key: 'transfer_linepay', label: '💚 LINE', paid: false },
+        { key: 'cod', label: '📦 貨到', paid: false },
+        { key: 'pending', label: '❓ 待定', paid: false },
     ]
 
     const getPaymentLabel = (method: PaymentMethod) => {
@@ -238,7 +264,18 @@ export default function MobilePOS({
                                         >
                                             −
                                         </button>
-                                        <span className="px-3 py-1 text-white min-w-[40px] text-center">{item.quantity}</span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={item.quantity}
+                                            onChange={(e) => {
+                                                const newQty = parseInt(e.target.value) || 1
+                                                if (newQty > 0) {
+                                                    updateQuantity(item.product_id, newQty)
+                                                }
+                                            }}
+                                            className="w-12 py-1 text-white text-center bg-transparent border-0 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
                                         <button
                                             onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
                                             className="px-3 py-1 text-white hover:bg-slate-600 rounded-r-lg"
@@ -333,16 +370,34 @@ export default function MobilePOS({
                     </div>
                 )}
 
-                {/* 總計 + 結帳 */}
-                <div className="flex items-center gap-3">
+                {/* 總計 + 暫存/結帳 */}
+                <div className="flex items-center gap-2">
                     <div className="flex-1">
                         <div className="text-slate-400 text-sm">應收金額</div>
                         <div className="text-white text-2xl font-bold">{formatCurrency(finalTotal)}</div>
                     </div>
                     <button
+                        onClick={() => setShowDraftsPicker(true)}
+                        className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-4 px-4 rounded-lg transition-all relative"
+                    >
+                        📋
+                        {drafts.length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                                {drafts.length}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={handleSaveDraft}
+                        disabled={loading || cart.length === 0}
+                        className="bg-amber-600 hover:bg-amber-500 disabled:bg-slate-600 text-white font-bold py-4 px-4 rounded-lg transition-all"
+                    >
+                        暫存
+                    </button>
+                    <button
                         onClick={handleCheckout}
                         disabled={loading || cart.length === 0}
-                        className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-600 text-white font-bold text-lg py-4 px-8 rounded-lg transition-all"
+                        className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-600 text-white font-bold text-lg py-4 px-6 rounded-lg transition-all"
                     >
                         {loading ? '處理中...' : '結帳'}
                     </button>
@@ -444,6 +499,81 @@ export default function MobilePOS({
                                 className="w-full bg-slate-700 text-slate-300 py-3 rounded-lg"
                             >
                                 取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 暫存訂單 Modal */}
+            {showDraftsPicker && (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
+                    <div className="w-full bg-slate-800 rounded-t-2xl max-h-[80vh] flex flex-col">
+                        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-white">暫存訂單</h3>
+                            <button onClick={() => setShowDraftsPicker(false)} className="text-slate-400 text-2xl">×</button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                            {drafts.length === 0 ? (
+                                <div className="text-center text-slate-500 py-10">
+                                    <div className="text-4xl mb-2">📋</div>
+                                    <div>目前沒有暫存訂單</div>
+                                </div>
+                            ) : (
+                                drafts.map((draft) => {
+                                    const draftSubtotal = draft.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0)
+                                    let draftDiscountAmount = 0
+                                    if (draft.discount_type === 'percent') {
+                                        draftDiscountAmount = (draftSubtotal * draft.discount_value) / 100
+                                    } else if (draft.discount_type === 'amount') {
+                                        draftDiscountAmount = draft.discount_value
+                                    }
+                                    const draftTotal = Math.max(0, draftSubtotal - draftDiscountAmount)
+
+                                    return (
+                                        <div key={draft.id} className="bg-slate-700 rounded-lg p-3">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <div className="text-white font-medium">
+                                                        {draft.customers?.customer_name || '散客'}
+                                                    </div>
+                                                    <div className="text-slate-400 text-xs">
+                                                        {new Date(draft.created_at).toLocaleString('zh-TW')}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-white font-bold">{formatCurrency(draftTotal)}</div>
+                                                    <div className="text-slate-400 text-xs">{draft.items.length} 項商品</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        handleLoadDraft(draft)
+                                                        setShowDraftsPicker(false)
+                                                    }}
+                                                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-sm font-medium"
+                                                >
+                                                    載入
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteDraft(draft.id)}
+                                                    className="bg-red-600 hover:bg-red-500 text-white py-2 px-4 rounded-lg text-sm font-medium"
+                                                >
+                                                    刪除
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            )}
+                        </div>
+                        <div className="p-3 pb-6 border-t border-slate-700">
+                            <button
+                                onClick={() => setShowDraftsPicker(false)}
+                                className="w-full bg-slate-700 text-slate-300 py-3 rounded-lg"
+                            >
+                                關閉
                             </button>
                         </div>
                     </div>

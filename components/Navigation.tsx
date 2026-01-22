@@ -29,10 +29,10 @@ const navItems: NavItem[] = [
   },
   {
     label: '往來對象',
-    roles: ['admin'],
+    roles: ['admin', 'staff'],
     submenu: [
       { href: '/vendors', label: '廠商管理', roles: ['admin'] },
-      { href: '/customers', label: '客戶管理', roles: ['admin'] },
+      { href: '/customers', label: '客戶管理', roles: ['admin', 'staff'] },
     ],
   },
   { href: '/sales', label: '銷售記錄', roles: ['admin', 'staff'] },
