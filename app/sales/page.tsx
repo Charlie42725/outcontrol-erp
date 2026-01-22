@@ -69,6 +69,7 @@ type SaleItem = {
   id: string
   quantity: number
   price: number
+  cost?: number
   snapshot_name: string
   product_id: string
   products: {
@@ -95,6 +96,8 @@ type Sale = {
   item_count?: number
   total_quantity?: number
   avg_price?: number
+  profit?: number
+  total_cost?: number
   sale_items?: SaleItem[]
   customers?: {
     customer_name: string
@@ -107,6 +110,8 @@ type CustomerGroup = {
   sales: Sale[]
   total_pending: number
   pending_count: number
+  total_revenue: number
+  total_profit: number
 }
 
 type ProductStats = {
@@ -254,6 +259,12 @@ export default function SalesPage() {
               return // 只显示未出货的
             }
 
+            // 計算這筆銷售的毛利
+            const totalCost = sale.sale_items?.reduce((sum, item) => sum + (item.cost || 0) * item.quantity, 0) || 0
+            const saleProfit = sale.total - totalCost
+            sale.profit = saleProfit
+            sale.total_cost = totalCost
+
             const key = sale.customer_code || 'WALK_IN'
 
             if (!groups[key]) {
@@ -264,11 +275,15 @@ export default function SalesPage() {
                   : '散客',
                 sales: [],
                 total_pending: 0,
-                pending_count: 0
+                pending_count: 0,
+                total_revenue: 0,
+                total_profit: 0
               }
             }
 
             groups[key].sales.push(sale)
+            groups[key].total_revenue += sale.total
+            groups[key].total_profit += saleProfit
 
             // 统计待出货
             if (sale.fulfillment_status !== 'completed') {
@@ -284,13 +299,26 @@ export default function SalesPage() {
             ? allSales.filter((s: Sale) => s.fulfillment_status !== 'completed')
             : allSales
 
+          // 不分组情況，計算每筆銷售的毛利
+          let totalRevenue = 0
+          let totalProfit = 0
+          const salesWithProfit = filteredSales.map((sale: Sale) => {
+            const totalCost = sale.sale_items?.reduce((sum: number, item: SaleItem) => sum + (item.cost || 0) * item.quantity, 0) || 0
+            const saleProfit = sale.total - totalCost
+            totalRevenue += sale.total
+            totalProfit += saleProfit
+            return { ...sale, profit: saleProfit, total_cost: totalCost }
+          })
+
           // 用单个组包装所有销售
           setCustomerGroups([{
             customer_code: null,
             customer_name: '所有銷售',
-            sales: filteredSales,
+            sales: salesWithProfit,
             total_pending: 0,
-            pending_count: 0
+            pending_count: 0,
+            total_revenue: totalRevenue,
+            total_profit: totalProfit
           }])
         }
       }
@@ -826,6 +854,12 @@ export default function SalesPage() {
 
                       <div className="flex items-center gap-4">
                         <div className="text-right">
+                          <div className="text-sm text-gray-500 dark:text-gray-400">總毛利</div>
+                          <div className={`text-lg font-bold ${group.total_profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            {group.total_profit >= 0 ? '+' : ''}{formatCurrency(group.total_profit)}
+                          </div>
+                        </div>
+                        <div className="text-right">
                           <div className="text-sm text-gray-500 dark:text-gray-400">待出貨</div>
                           <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
                             {formatCurrency(group.total_pending)}
@@ -847,6 +881,7 @@ export default function SalesPage() {
                               <th className="pb-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100">付款方式</th>
                               <th className="pb-2 text-left text-xs font-semibold text-gray-900 dark:text-gray-100">銷售日期</th>
                               <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">總金額</th>
+                              <th className="pb-2 text-right text-xs font-semibold text-gray-900 dark:text-gray-100">毛利</th>
                               <th className="pb-2 text-center text-xs font-semibold text-gray-900 dark:text-gray-100">付款</th>
                               <th className="pb-2 text-center text-xs font-semibold text-gray-900 dark:text-gray-100">出貨</th>
                               <th className="pb-2 text-center text-xs font-semibold text-gray-900 dark:text-gray-100">操作</th>
@@ -877,6 +912,9 @@ export default function SalesPage() {
                                   </td>
                                   <td className="py-2 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
                                     {formatCurrency(sale.total)}
+                                  </td>
+                                  <td className={`py-2 text-right text-sm font-semibold ${(sale.profit || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {(sale.profit || 0) >= 0 ? '+' : ''}{formatCurrency(sale.profit || 0)}
                                   </td>
                                   <td className="py-2 text-center text-sm">
                                     <span

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       .not('barcode', 'is', null)
 
     const existingBarcodes = new Set(
-      existingProducts?.map(p => p.barcode?.toLowerCase()) || []
+      (existingProducts as { barcode: string | null }[] | null)?.map(p => p.barcode?.toLowerCase()) || []
     )
 
     // Validate rows
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     let maxNumber = 0
     if (latestProducts && latestProducts.length > 0) {
-      const lastCode = latestProducts[0].item_code
+      const lastCode = (latestProducts[0] as { item_code: string }).item_code
       const match = lastCode.match(/^I(\d+)$/)
       if (match) {
         maxNumber = parseInt(match[1])
@@ -208,8 +208,8 @@ export async function POST(request: NextRequest) {
     })
 
     // Batch insert products
-    const { data: insertedProducts, error: insertError } = await supabaseServer
-      .from('products')
+    const { data: insertedProducts, error: insertError } = await (supabaseServer
+      .from('products') as any)
       .insert(productsToInsert)
       .select()
 
