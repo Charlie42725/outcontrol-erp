@@ -1064,8 +1064,6 @@ export default function POSPage() {
         setPaymentMethod={setPaymentMethod}
         isPaid={isPaid}
         setIsPaid={setIsPaid}
-        isDelivered={isDelivered}
-        setIsDelivered={setIsDelivered}
         loading={loading}
         error={error}
         finalTotal={finalTotal}
