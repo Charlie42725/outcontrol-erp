@@ -55,8 +55,6 @@ type MobilePOSProps = {
     setPaymentMethod: (p: PaymentMethod) => void
     isPaid: boolean
     setIsPaid: (b: boolean) => void
-    isDelivered: boolean
-    setIsDelivered: (b: boolean) => void
     loading: boolean
     error: string
     finalTotal: number
@@ -88,8 +86,6 @@ export default function MobilePOS({
     setPaymentMethod,
     isPaid,
     setIsPaid,
-    isDelivered,
-    setIsDelivered,
     loading,
     error,
     finalTotal,

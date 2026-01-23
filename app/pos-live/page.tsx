@@ -64,7 +64,6 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [isPaid, setIsPaid] = useState(true)
-  const [isDelivered, setIsDelivered] = useState(true) // 新增：已出貨狀態
   const [deliveryMethod, setDeliveryMethod] = useState('') // 新增：交貨方式
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('') // 新增：預計出貨日
   const [deliveryNote, setDeliveryNote] = useState('') // 新增：出貨備註
@@ -739,6 +738,10 @@ export default function POSPage() {
       // Use combo price adjusted cart for checkout
       const checkoutCart = applyComboPrice()
 
+      // 檢查購物車中是否有未出貨的商品
+      const hasNotDeliveredItems = cart.some(item => item.isNotDelivered)
+      const finalIsDelivered = !hasNotDeliveredItems
+
       const res = await fetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -747,10 +750,10 @@ export default function POSPage() {
           source: salesMode,
           payment_method: paymentMethod,
           is_paid: isPaid,
-          is_delivered: isDelivered, // 新增：是否已出貨
-          delivery_method: !isDelivered ? deliveryMethod : undefined, // 未出貨時保存交貨方式
-          expected_delivery_date: !isDelivered ? expectedDeliveryDate : undefined, // 未出貨時保存預計出貨日
-          delivery_note: !isDelivered ? deliveryNote : undefined, // 未出貨時保存備註
+          is_delivered: finalIsDelivered,
+          delivery_method: !finalIsDelivered ? deliveryMethod : undefined,
+          expected_delivery_date: !finalIsDelivered ? expectedDeliveryDate : undefined,
+          delivery_note: !finalIsDelivered ? deliveryNote : undefined,
           note: note || undefined,
           discount_type: discountType,
           discount_value: discountValue,
@@ -772,7 +775,6 @@ export default function POSPage() {
         setCustomerSearchQuery('')
         setPaymentMethod('cash')
         setIsPaid(true)
-        setIsDelivered(true) // 重置為已出貨
         setDeliveryMethod('') // 清空交貨方式
         setExpectedDeliveryDate('') // 清空預計出貨日
         setDeliveryNote('') // 清空出貨備註
@@ -1020,8 +1022,6 @@ export default function POSPage() {
         setPaymentMethod={setPaymentMethod}
         isPaid={isPaid}
         setIsPaid={setIsPaid}
-        isDelivered={isDelivered}
-        setIsDelivered={setIsDelivered}
         loading={loading}
         error={error}
         finalTotal={finalTotal}
@@ -1855,20 +1855,16 @@ export default function POSPage() {
                   />
                   <span className="text-sm text-white">已收款</span>
                 </label>
-                <label className="flex-1 flex items-center gap-2 cursor-pointer rounded-lg px-3 py-2.5 bg-slate-700 hover:bg-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={isDelivered}
-                    onChange={(e) => setIsDelivered(e.target.checked)}
-                    className="w-4 h-4 accent-indigo-500"
-                  />
-                  <span className="text-sm text-white">已出貨</span>
-                </label>
+                {cart.some(item => item.isNotDelivered) && (
+                  <div className="flex-1 flex items-center gap-2 rounded-lg px-3 py-2.5 bg-orange-600">
+                    <span className="text-sm text-white">有未出貨商品</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Delivery Details - Only when not delivered */}
-            {!isDelivered && (
+            {/* Delivery Details - Only when has not delivered items */}
+            {cart.some(item => item.isNotDelivered) && (
               <div className="space-y-2 border-2 border-orange-400 dark:border-orange-600 rounded-lg p-3 bg-orange-50 dark:bg-orange-900/20">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">預計出貨日</label>
