@@ -87,36 +87,29 @@ export async function POST(request: NextRequest) {
         return
       }
 
-      // Check required field: 條碼
-      if (!row.條碼 || String(row.條碼).trim() === '') {
-        errors.push({
-          row: rowNum,
-          field: '條碼',
-          message: '條碼為必填欄位'
-        })
-        return
-      }
+      // Check barcode only if provided
+      const barcode = row.條碼 ? String(row.條碼).trim().toLowerCase() : null
 
-      const barcode = String(row.條碼).trim().toLowerCase()
+      if (barcode) {
+        // Check duplicate barcode in file
+        if (seenBarcodes.has(barcode)) {
+          errors.push({
+            row: rowNum,
+            field: '條碼',
+            message: '條碼在檔案中重複'
+          })
+          return
+        }
 
-      // Check duplicate barcode in file
-      if (seenBarcodes.has(barcode)) {
-        errors.push({
-          row: rowNum,
-          field: '條碼',
-          message: '條碼在檔案中重複'
-        })
-        return
-      }
-
-      // Check duplicate barcode in database
-      if (existingBarcodes.has(barcode)) {
-        errors.push({
-          row: rowNum,
-          field: '條碼',
-          message: '條碼已存在於資料庫中'
-        })
-        return
+        // Check duplicate barcode in database
+        if (existingBarcodes.has(barcode)) {
+          errors.push({
+            row: rowNum,
+            field: '條碼',
+            message: '條碼已存在於資料庫中'
+          })
+          return
+        }
       }
 
       // Validate numeric fields
@@ -151,7 +144,9 @@ export async function POST(request: NextRequest) {
         return
       }
 
-      seenBarcodes.add(barcode)
+      if (barcode) {
+        seenBarcodes.add(barcode)
+      }
       validRows.push(row)
     })
 
@@ -196,7 +191,7 @@ export async function POST(request: NextRequest) {
       return {
         item_code: itemCode,
         name: String(row.商品名稱).trim(),
-        barcode: String(row.條碼).trim(),
+        barcode: row.條碼 ? String(row.條碼).trim() : null,
         price: Number(row.售價) || 0,
         cost: unitCost,
         stock: quantity,

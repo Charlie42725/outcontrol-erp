@@ -127,9 +127,6 @@ export default function ProductImportModal({
         if (!row.商品名稱 || String(row.商品名稱).trim() === '') {
           hasError = true
           errorMessage = '商品名稱為必填'
-        } else if (!row.條碼 || String(row.條碼).trim() === '') {
-          hasError = true
-          errorMessage = '條碼為必填'
         }
 
         // Validate numeric fields
