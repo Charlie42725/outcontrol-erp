@@ -521,7 +521,7 @@ export default function DashboardPage() {
               {formatCurrency(stats.netProfit)}
             </div>
             <div className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-              毛利: {formatCurrency(stats.grossProfit)}
+              淨利率: {stats.todaySales > 0 ? ((stats.netProfit / stats.todaySales) * 100).toFixed(1) : 0}%
             </div>
           </div>
         </div>
