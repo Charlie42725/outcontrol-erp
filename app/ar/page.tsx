@@ -982,6 +982,7 @@ export default function ARPageV2() {
                   <option value="transfer_linepay">轉帳 - LINE Pay</option>
                 </optgroup>
                 <option value="cod">貨到付款</option>
+                <option value="store_credit">購物金抵扣</option>
               </select>
             </div>
 

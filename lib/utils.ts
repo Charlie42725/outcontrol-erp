@@ -19,22 +19,44 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(date: string | Date): string {
+  // 以資料庫為原則：直接解析字串，不做時區轉換
+  if (typeof date === 'string') {
+    // 嘗試從字串中直接提取日期部分
+    // 格式：2024-01-15 或 2024-01-15T14:30:00.000Z
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+      const [, year, month, day] = match
+      return `${year}-${month}-${day}`
+    }
+  }
+
+  // 如果不是字串或無法解析，回退到 Date 對象處理
   const d = new Date(date)
-  // 資料庫已存台灣時間（ISO 格式），用 UTC 方法直接讀取
-  const year = d.getUTCFullYear()
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(d.getUTCDate()).padStart(2, '0')
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
 export function formatDateTime(date: string | Date): string {
+  // 以資料庫為原則：直接解析 ISO 字串，不做時區轉換
+  if (typeof date === 'string') {
+    // 嘗試從 ISO 字串中直接提取日期時間部分
+    // 格式：2024-01-15T14:30:00.000Z 或 2024-01-15T14:30:00+08:00
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+    if (match) {
+      const [, year, month, day, hours, minutes] = match
+      return `${year}-${month}-${day} ${hours}:${minutes}`
+    }
+  }
+
+  // 如果不是字串或無法解析，回退到 Date 對象處理
   const d = new Date(date)
-  // 資料庫已存台灣時間（ISO 格式），用 UTC 方法直接讀取
-  const year = d.getUTCFullYear()
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(d.getUTCDate()).padStart(2, '0')
-  const hours = String(d.getUTCHours()).padStart(2, '0')
-  const minutes = String(d.getUTCMinutes()).padStart(2, '0')
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
   return `${year}-${month}-${day} ${hours}:${minutes}`
 }
 
@@ -49,6 +71,7 @@ export function formatPaymentMethod(method: string): string {
     'transfer_linepay': '轉帳 - LINE Pay',
     'cod': '貨到付款',
     'pending': '待確定',
+    'store_credit': '購物金',
     // 兼容舊的 'transfer' 值
     'transfer': '轉帳',
   }
