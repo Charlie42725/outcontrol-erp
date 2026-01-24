@@ -135,7 +135,8 @@ export const settlementSchema = z.object({
     'transfer_esun',
     'transfer_union',
     'transfer_linepay',
-    'cod'
+    'cod',
+    'store_credit'
   ]).optional(),
   amount: z.number().positive('Amount must be positive'),
   note: z.string().optional(),
