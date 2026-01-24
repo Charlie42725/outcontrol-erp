@@ -1393,6 +1393,9 @@ export default function POSPage() {
                             {cart[item.indices![0]]?.isFreeGift && (
                               <span className="ml-2 text-xs bg-red-500 text-white px-2 py-0.5 rounded">贈品</span>
                             )}
+                            {cart[item.indices![0]]?.isNotDelivered && (
+                              <span className="ml-2 text-xs bg-orange-500 text-white px-2 py-0.5 rounded">未出貨</span>
+                            )}
                           </div>
                           <div className="text-xs text-gray-600 dark:text-gray-400">
                             {hasComboDiscount && (
@@ -1401,17 +1404,28 @@ export default function POSPage() {
                             {formatCurrency(item.price)}
                             {isGrouped && <span className="ml-2">× {item.quantity} 抽</span>}
                           </div>
-                          {!item.ichiban_kuji_id && (
-                            <label className="flex items-center gap-1 mt-1 cursor-pointer">
+                          <div className="flex items-center gap-3 mt-1">
+                            {!item.ichiban_kuji_id && (
+                              <label className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={cart[item.indices![0]]?.isFreeGift || false}
+                                  onChange={() => toggleFreeGift(item.indices![0])}
+                                  className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-xs text-gray-600 dark:text-gray-400">贈品</span>
+                              </label>
+                            )}
+                            <label className="flex items-center gap-1 cursor-pointer">
                               <input
                                 type="checkbox"
-                                checked={cart[item.indices![0]]?.isFreeGift || false}
-                                onChange={() => toggleFreeGift(item.indices![0])}
-                                className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                checked={cart[item.indices![0]]?.isNotDelivered || false}
+                                onChange={() => toggleNotDelivered(item.indices![0])}
+                                className="w-3 h-3 rounded border-gray-300 text-orange-500 focus:ring-orange-500 accent-orange-500"
                               />
-                              <span className="text-xs text-gray-600 dark:text-gray-400">贈品</span>
+                              <span className="text-xs text-gray-600 dark:text-gray-400">未出貨</span>
                             </label>
-                          )}
+                          </div>
                         </div>
                         <button
                           onClick={() => {
