@@ -131,10 +131,10 @@ export async function GET(request: NextRequest) {
 
     // 並行查詢所有相關資料
     const [customersResult, itemsResult, salesResult, saleItemsResult] = await Promise.all([
-      // 查詢客戶
+      // 查詢客戶（包含購物金餘額）
       supabaseServer
         .from('customers')
-        .select('customer_code, customer_name')
+        .select('customer_code, customer_name, store_credit')
         .in('customer_code', customerCodes),
       // 查詢 sale items（如果有）
       itemIds.length > 0

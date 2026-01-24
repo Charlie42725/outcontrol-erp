@@ -52,6 +52,7 @@ type ARAccount = {
 type CustomerGroup = {
   partner_code: string
   customer_name: string
+  store_credit: number
   accounts: ARAccount[]
   total_balance: number
   unpaid_count: number
@@ -169,6 +170,7 @@ export default function ARPageV2() {
               groups[key] = {
                 partner_code: saleNo,
                 customer_name: `${saleNo} - ${account.customers?.customer_name || account.partner_code}`,
+                store_credit: account.customers?.store_credit || 0,
                 accounts: [],
                 total_balance: 0,
                 unpaid_count: 0
@@ -206,6 +208,7 @@ export default function ARPageV2() {
               groups[key] = {
                 partner_code: account.partner_code,
                 customer_name: account.customers?.customer_name || account.partner_code,
+                store_credit: account.customers?.store_credit || 0,
                 accounts: [],
                 total_balance: 0,
                 unpaid_count: 0
@@ -359,6 +362,12 @@ export default function ARPageV2() {
     return total
   }
 
+  const getCurrentCustomerStoreCredit = () => {
+    if (!currentCustomer) return 0
+    const group = customerGroups.find(g => g.partner_code === currentCustomer)
+    return group?.store_credit || 0
+  }
+
   const handleReceipt = async () => {
     if (selectedAccounts.size === 0) {
       setError('請選擇至少一筆帳款')
@@ -376,6 +385,15 @@ export default function ARPageV2() {
     if (amount > selectedTotal) {
       setError('收款金額不能超過所選帳款總額')
       return
+    }
+
+    // 購物金餘額檢查
+    if (receiptMethod === 'store_credit') {
+      const storeCredit = getCurrentCustomerStoreCredit()
+      if (amount > storeCredit) {
+        setError(`購物金餘額不足，目前餘額: ${formatCurrency(storeCredit)}`)
+        return
+      }
     }
 
     setProcessing(true)
@@ -984,6 +1002,21 @@ export default function ARPageV2() {
                 <option value="cod">貨到付款</option>
                 <option value="store_credit">購物金抵扣</option>
               </select>
+              {receiptMethod === 'store_credit' && (
+                <div className="mt-2 p-3 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-amber-800 dark:text-amber-200">客戶購物金餘額</span>
+                    <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(getCurrentCustomerStoreCredit())}
+                    </span>
+                  </div>
+                  {parseFloat(receiptAmount) > getCurrentCustomerStoreCredit() && receiptAmount !== '' && (
+                    <div className="mt-1 text-xs text-red-600 dark:text-red-400">
+                      收款金額超過購物金餘額
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">
