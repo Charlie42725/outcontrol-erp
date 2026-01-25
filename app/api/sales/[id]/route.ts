@@ -584,36 +584,66 @@ export async function DELETE(
           // 查詢 settlement 資訊
           const { data: settlement } = await (supabaseServer
             .from('settlements') as any)
-            .select('amount, account_id')
+            .select('amount, account_id, method, partner_code')
             .eq('id', settlementId)
             .single()
 
-          if (settlement && settlement.account_id) {
-            // 刪除 account_transactions 記錄
-            await (supabaseServer
-              .from('account_transactions') as any)
-              .delete()
-              .eq('ref_type', 'settlement')
-              .eq('ref_id', settlementId)
+          if (settlement) {
+            // 如果是購物金收款，回補購物金
+            if (settlement.method === 'store_credit' && settlement.partner_code) {
+              // 獲取客戶當前購物金餘額
+              const { data: customer } = await (supabaseServer
+                .from('customers') as any)
+                .select('store_credit')
+                .eq('customer_code', settlement.partner_code)
+                .single()
 
-            // 還原帳戶餘額（減去收款金額）
-            const { data: account } = await (supabaseServer
-              .from('accounts') as any)
-              .select('balance')
-              .eq('id', settlement.account_id)
-              .single()
+              if (customer) {
+                const newBalance = customer.store_credit + settlement.amount
 
-            if (account) {
-              const newBalance = Number(account.balance) - settlement.amount
+                // 回補客戶購物金
+                await (supabaseServer
+                  .from('customers') as any)
+                  .update({ store_credit: newBalance })
+                  .eq('customer_code', settlement.partner_code)
+
+                // 刪除購物金扣除日誌
+                await (supabaseServer
+                  .from('customer_balance_logs') as any)
+                  .delete()
+                  .eq('ref_type', 'ar_receipt')
+                  .eq('ref_id', settlementId)
+
+                console.log(`[Delete Sale ${id}] Restored store_credit ${settlement.amount} to customer ${settlement.partner_code}`)
+              }
+            } else if (settlement.account_id) {
+              // 非購物金收款，還原帳戶餘額
+              // 刪除 account_transactions 記錄
               await (supabaseServer
-                .from('accounts') as any)
-                .update({
-                  balance: newBalance,
-                  updated_at: getTaiwanTime()
-                })
-                .eq('id', settlement.account_id)
+                .from('account_transactions') as any)
+                .delete()
+                .eq('ref_type', 'settlement')
+                .eq('ref_id', settlementId)
 
-              console.log(`[Delete Sale ${id}] Restored receipt account ${settlement.account_id}: -${settlement.amount}`)
+              // 還原帳戶餘額（減去收款金額）
+              const { data: account } = await (supabaseServer
+                .from('accounts') as any)
+                .select('balance')
+                .eq('id', settlement.account_id)
+                .single()
+
+              if (account) {
+                const newBalance = Number(account.balance) - settlement.amount
+                await (supabaseServer
+                  .from('accounts') as any)
+                  .update({
+                    balance: newBalance,
+                    updated_at: getTaiwanTime()
+                  })
+                  .eq('id', settlement.account_id)
+
+                console.log(`[Delete Sale ${id}] Restored receipt account ${settlement.account_id}: -${settlement.amount}`)
+              }
             }
           }
 

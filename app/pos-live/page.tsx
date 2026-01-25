@@ -62,7 +62,7 @@ type TodaySale = {
 export default function POSPage() {
   const [barcode, setBarcode] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pending')
   const [isPaid, setIsPaid] = useState(true)
   const [deliveryMethod, setDeliveryMethod] = useState('') // 新增：交貨方式
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('') // 新增：預計出貨日
