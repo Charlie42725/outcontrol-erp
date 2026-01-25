@@ -390,6 +390,9 @@ export interface Database {
           account_name: string
           account_type: 'cash' | 'bank' | 'petty_cash'
           payment_method_code: string | null
+          display_name: string | null
+          sort_order: number
+          auto_mark_paid: boolean
           balance: number
           is_active: boolean
           created_at: string
@@ -400,6 +403,9 @@ export interface Database {
           account_name: string
           account_type: 'cash' | 'bank' | 'petty_cash'
           payment_method_code?: string | null
+          display_name?: string | null
+          sort_order?: number
+          auto_mark_paid?: boolean
           balance?: number
           is_active?: boolean
           created_at?: string
@@ -410,6 +416,9 @@ export interface Database {
           account_name?: string
           account_type?: 'cash' | 'bank' | 'petty_cash'
           payment_method_code?: string | null
+          display_name?: string | null
+          sort_order?: number
+          auto_mark_paid?: boolean
           balance?: number
           is_active?: boolean
           created_at?: string

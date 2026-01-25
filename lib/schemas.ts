@@ -173,6 +173,10 @@ export const ichibanKujiDraftSchema = z.object({
 export const accountSchema = z.object({
   account_name: z.string().min(1, 'Account name is required'),
   account_type: z.enum(['cash', 'bank', 'petty_cash']),
+  payment_method_code: z.string().nullable().optional(),
+  display_name: z.string().nullable().optional(),
+  sort_order: z.number().default(999),
+  auto_mark_paid: z.boolean().default(false),
   balance: z.number().default(0),
   is_active: z.boolean().default(true),
 })

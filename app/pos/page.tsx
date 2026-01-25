@@ -35,6 +35,18 @@ type Customer = {
   credit_limit: number  // 信用额度
 }
 
+type PaymentAccount = {
+  id: string
+  account_name: string
+  account_type: 'cash' | 'bank' | 'petty_cash'
+  payment_method_code: string | null
+  display_name: string | null
+  sort_order: number
+  auto_mark_paid: boolean
+  balance: number
+  is_active: boolean
+}
+
 type SaleDraft = {
   id: string
   customer_code: string | null
@@ -70,6 +82,7 @@ export default function POSPage() {
   const [deliveryNote, setDeliveryNote] = useState('') // 新增：出貨備註
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -198,6 +211,7 @@ export default function POSPage() {
     fetchIchibanKujis()
     fetchDrafts()
     fetchClosingStats() // 先獲取結帳統計，包含 lastClosingTime
+    fetchPaymentAccounts() // 載入付款帳戶選項
   }, [])
 
   // Save pinned products to localStorage whenever it changes
@@ -238,6 +252,28 @@ export default function POSPage() {
       }
     } catch (err) {
       console.error('Failed to fetch customers:', err)
+    }
+  }
+
+  const fetchPaymentAccounts = async () => {
+    try {
+      const res = await fetch('/api/accounts?active_only=true')
+      const data = await res.json()
+      if (data.ok) {
+        // 只取有 payment_method_code 的帳戶作為付款方式選項
+        const accounts = (data.data || []).filter((acc: PaymentAccount) => acc.payment_method_code)
+        setPaymentAccounts(accounts)
+        // 設定預設付款方式為第一個帳戶（通常是現金）
+        if (accounts.length > 0 && !paymentMethod) {
+          const defaultAccount = accounts.find((acc: PaymentAccount) => acc.payment_method_code === 'cash') || accounts[0]
+          if (defaultAccount.payment_method_code) {
+            setPaymentMethod(defaultAccount.payment_method_code as PaymentMethod)
+            setIsPaid(defaultAccount.auto_mark_paid)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch payment accounts:', err)
     }
   }
 
@@ -1058,6 +1094,7 @@ export default function POSPage() {
         setCart={setCart}
         products={products}
         customers={customers}
+        paymentAccounts={paymentAccounts}
         selectedCustomer={selectedCustomer}
         setSelectedCustomer={setSelectedCustomer}
         paymentMethod={paymentMethod}
@@ -1781,117 +1818,24 @@ export default function POSPage() {
               <div>
                 <label className="block font-medium mb-1.5 text-sm text-slate-300">付款方式</label>
 
-                {/* 單一付款模式：顯示原本的付款方式按鈕 */}
+                {/* 單一付款模式：從帳戶動態載入付款方式 */}
                 {!isMultiPayment && (
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('cash')
-                        setIsPaid(true)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'cash'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      💵 現金
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('card')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'card'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      💳 刷卡
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('transfer_cathay')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_cathay'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      🏦 國泰
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('transfer_fubon')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_fubon'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      🏦 富邦
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('transfer_esun')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_esun'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      🏦 玉山
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('transfer_union')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_union'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      🏦 聯邦
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('transfer_linepay')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'transfer_linepay'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      💚 LINE
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('cod')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'cod'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      📦 貨到
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPaymentMethod('pending')
-                        setIsPaid(false)
-                      }}
-                      className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === 'pending'
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      ❓ 待定
-                    </button>
+                    {paymentAccounts.map((account) => (
+                      <button
+                        key={account.id}
+                        onClick={() => {
+                          setPaymentMethod(account.payment_method_code as PaymentMethod)
+                          setIsPaid(account.auto_mark_paid)
+                        }}
+                        className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === account.payment_method_code
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                      >
+                        {account.display_name || account.account_name}
+                      </button>
+                    ))}
                   </div>
                 )}
 

@@ -31,6 +31,18 @@ type Customer = {
     credit_limit: number
 }
 
+type PaymentAccount = {
+    id: string
+    account_name: string
+    account_type: 'cash' | 'bank' | 'petty_cash'
+    payment_method_code: string | null
+    display_name: string | null
+    sort_order: number
+    auto_mark_paid: boolean
+    balance: number
+    is_active: boolean
+}
+
 type SaleDraft = {
     id: string
     customer_code: string | null
@@ -49,6 +61,7 @@ type MobilePOSProps = {
     setCart: (cart: CartItem[] | ((prev: CartItem[]) => CartItem[])) => void
     products: Product[]
     customers: Customer[]
+    paymentAccounts: PaymentAccount[]
     selectedCustomer: Customer | null
     setSelectedCustomer: (c: Customer | null) => void
     paymentMethod: PaymentMethod
@@ -80,6 +93,7 @@ export default function MobilePOS({
     setCart,
     products,
     customers,
+    paymentAccounts,
     selectedCustomer,
     setSelectedCustomer,
     paymentMethod,
@@ -172,20 +186,16 @@ export default function MobilePOS({
         c.customer_code.toLowerCase().includes(customerSearchQuery.toLowerCase())
     )
 
-    const paymentMethods = [
-        { key: 'cash', label: '💵 現金', paid: true },
-        { key: 'card', label: '💳 刷卡', paid: false },
-        { key: 'transfer_cathay', label: '🏦 國泰', paid: false },
-        { key: 'transfer_fubon', label: '🏦 富邦', paid: false },
-        { key: 'transfer_esun', label: '🏦 玉山', paid: false },
-        { key: 'transfer_union', label: '🏦 聯邦', paid: false },
-        { key: 'transfer_linepay', label: '💚 LINE', paid: false },
-        { key: 'cod', label: '📦 貨到', paid: false },
-        { key: 'pending', label: '❓ 待定', paid: false },
-    ]
+    // 從帳戶動態生成付款方式選項
+    const paymentMethods = paymentAccounts.map(acc => ({
+        key: acc.payment_method_code || '',
+        label: acc.display_name || acc.account_name,
+        paid: acc.auto_mark_paid,
+    }))
 
     const getPaymentLabel = (method: PaymentMethod) => {
-        return paymentMethods.find(p => p.key === method)?.label || method
+        const account = paymentAccounts.find(acc => acc.payment_method_code === method)
+        return account?.display_name || account?.account_name || method
     }
 
     return (

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     let query = (supabaseServer.from('accounts') as any)
       .select('*')
-      .order('account_type', { ascending: true })
+      .order('sort_order', { ascending: true })
       .order('account_name', { ascending: true })
 
     if (activeOnly) {
@@ -72,6 +72,10 @@ export async function POST(request: NextRequest) {
       .insert({
         account_name: account.account_name,
         account_type: account.account_type,
+        payment_method_code: body.payment_method_code || null,
+        display_name: body.display_name || account.account_name,
+        sort_order: body.sort_order ?? 999,
+        auto_mark_paid: body.auto_mark_paid ?? false,
         // Balance is always 0 on creation now. Adjustments must be made via transaction.
         balance: 0,
         is_active: account.is_active !== false,
