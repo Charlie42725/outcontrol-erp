@@ -165,7 +165,7 @@ export default function NewExpensePage() {
                 <option value="">請選擇帳戶</option>
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.account_name} ({formatCurrency(acc.balance)})
+                    {acc.account_name}
                   </option>
                 ))}
               </select>
