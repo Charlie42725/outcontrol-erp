@@ -133,59 +133,9 @@ export async function POST(
       .single()
     const purchaseNo = purchaseData?.purchase_no || id
 
-    // 5. 寫入庫存日誌（trigger 會自動更新 products.stock）
-    // Since purchase was in 'pending' status, inventory was not updated yet
-    for (const item of updatedItems) {
-      // 寫入 inventory_logs，trigger 會自動更新 stock
-      const { error: logError } = await (supabaseServer
-        .from('inventory_logs') as any)
-        .insert({
-          product_id: item.product_id,
-          ref_type: 'purchase',
-          ref_id: id,
-          qty_change: item.quantity,
-          memo: `進貨批准入庫 - ${purchaseNo}`,
-        })
-
-      if (logError) {
-        console.error(`Failed to create inventory log for product ${item.product_id}:`, logError)
-        return NextResponse.json(
-          { ok: false, error: '庫存更新失敗：' + logError.message },
-          { status: 500 }
-        )
-      }
-
-      // 更新商品平均成本（stock 已由 trigger 更新）
-      const { data: product } = await (supabaseServer
-        .from('products') as any)
-        .select('stock, avg_cost')
-        .eq('id', item.product_id)
-        .single()
-
-      if (product) {
-        const currentStock = product.stock  // trigger 已經更新過的庫存
-        const oldAvgCost = product.avg_cost || 0
-
-        // 使用加權平均計算新的平均成本
-        let newAvgCost = oldAvgCost
-        if (currentStock > 0) {
-          const oldStock = currentStock - item.quantity
-          newAvgCost = ((oldStock * oldAvgCost) + (item.quantity * item.cost)) / currentStock
-        }
-
-        // 只更新平均成本（stock 由 trigger 處理）
-        const { error: updateCostError } = await (supabaseServer
-          .from('products') as any)
-          .update({ avg_cost: newAvgCost })
-          .eq('id', item.product_id)
-
-        if (updateCostError) {
-          console.error(`Failed to update avg_cost for product ${item.product_id}:`, updateCostError)
-        } else {
-          console.log(`[Approve] Updated avg_cost for product ${item.product_id}: ${oldAvgCost.toFixed(2)} -> ${newAvgCost.toFixed(2)}`)
-        }
-      }
-    }
+    // 5. 批准時不更新庫存！庫存只在收貨時更新，避免重複進貨
+    // 庫存更新在 /api/purchase-items/:id/receive 處理
+    console.log(`[Approve] Purchase ${purchaseNo} approved. Inventory will be updated upon receiving.`)
 
     // 6. Update purchase to confirmed
     const { data: confirmedPurchase, error: confirmError } = await (supabaseServer
@@ -232,7 +182,7 @@ export async function POST(
       {
         ok: true,
         data: confirmedPurchase,
-        message: '進貨單已批准，庫存和應付帳款已更新'
+        message: '進貨單已批准，應付帳款已建立。請於收貨時更新庫存。'
       },
       { status: 200 }
     )
