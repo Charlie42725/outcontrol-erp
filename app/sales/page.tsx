@@ -619,7 +619,26 @@ export default function SalesPage() {
       return
     }
 
-    const amountInput = prompt(`將「${item.snapshot_name}」(${item.quantity} 件) 轉為購物金\n\n請輸入零用金金額：\n（此金額將作為購物金及回補成本）`)
+    // 步驟 1：先輸入數量
+    const quantityInput = prompt(`將「${item.snapshot_name}」轉為購物金\n\n步驟 1/2：請輸入轉換數量\n（原數量：${item.quantity} 件）`, item.quantity.toString())
+
+    if (quantityInput === null) {
+      return // 用戶取消
+    }
+
+    const quantity = parseInt(quantityInput)
+    if (isNaN(quantity) || quantity <= 0) {
+      alert('請輸入有效的數量（正整數）')
+      return
+    }
+
+    if (quantity > item.quantity) {
+      alert(`轉換數量不能超過原數量（${item.quantity}）`)
+      return
+    }
+
+    // 步驟 2：再輸入金額
+    const amountInput = prompt(`將「${item.snapshot_name}」(${quantity} 件) 轉為購物金\n\n步驟 2/2：請輸入購物金金額\n（此金額將作為購物金及回補成本）`)
 
     if (amountInput === null) {
       return // 用戶取消
@@ -631,8 +650,8 @@ export default function SalesPage() {
       return
     }
 
-    const unitCost = amount / item.quantity
-    if (!confirm(`確定要將 ${formatCurrency(amount)} 轉為購物金嗎？\n\n• 購物金增加：${formatCurrency(amount)}\n• 庫存回補：${item.quantity} 件\n• 回補成本：${formatCurrency(unitCost)}/件`)) {
+    const unitCost = amount / quantity
+    if (!confirm(`確定要將 ${formatCurrency(amount)} 轉為購物金嗎？\n\n• 轉換數量：${quantity} / ${item.quantity} 件\n• 購物金增加：${formatCurrency(amount)}\n• 庫存回補：${quantity} 件\n• 回補成本：${formatCurrency(unitCost)}/件`)) {
       return
     }
 
@@ -643,14 +662,15 @@ export default function SalesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: amount,
-          note: `單品轉購物金 - ${item.snapshot_name}`,
+          quantity: quantity,
+          note: `單品轉購物金 - ${item.snapshot_name} (${quantity}/${item.quantity}件)`,
         }),
       })
 
       const data = await res.json()
 
       if (data.ok) {
-        alert(`轉購物金成功！\n\n客戶：${data.data.customer_name}\n商品：${data.data.product_name}\n購物金：${formatCurrency(data.data.store_credit_before)} → ${formatCurrency(data.data.store_credit_after)}\n回補庫存：${data.data.inventory_restored} 件\n新平均成本：${formatCurrency(data.data.new_avg_cost)}`)
+        alert(`轉購物金成功！\n\n客戶：${data.data.customer_name}\n商品：${data.data.product_name}\n轉換數量：${data.data.converted_quantity} / ${data.data.original_quantity} 件\n購物金：${formatCurrency(data.data.store_credit_before)} → ${formatCurrency(data.data.store_credit_after)}\n回補庫存：${data.data.inventory_restored} 件\n新平均成本：${formatCurrency(data.data.new_avg_cost)}`)
         fetchSales()
       } else {
         alert(`轉換失敗：${data.error}`)

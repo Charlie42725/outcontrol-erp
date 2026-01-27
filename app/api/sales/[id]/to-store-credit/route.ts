@@ -156,46 +156,165 @@ export async function POST(
                 created_at: getTaiwanTime(),
             })
 
-        // 6. 清除或調整應收帳款
-        if (!sale.is_paid) {
-            if (isFullConversion) {
-                // 全額轉換：刪除所有 AR 記錄
-                await (supabaseServer
-                    .from('partner_accounts') as any)
-                    .delete()
-                    .eq('ref_type', 'sale')
-                    .eq('ref_id', id)
-            } else {
-                // 部分轉換：按比例減少 AR
-                const { data: arRecords } = await (supabaseServer
-                    .from('partner_accounts') as any)
-                    .select('id, amount')
-                    .eq('ref_type', 'sale')
-                    .eq('ref_id', id)
+        // 6. 清除或調整應收帳款，並處理已收款部分的帳戶退款
+        // 取得 AR 記錄及其已收款金額
+        const { data: arRecords } = await (supabaseServer
+            .from('partner_accounts') as any)
+            .select('id, amount, received_paid')
+            .eq('ref_type', 'sale')
+            .eq('ref_id', id)
 
-                if (arRecords && arRecords.length > 0) {
-                    const totalArAmount = arRecords.reduce((sum: number, ar: any) => sum + ar.amount, 0)
-                    const reductionRatio = conversionAmount / sale.total
+        // 計算已收款的總金額（透過收款單收取的部分）
+        const totalReceivedFromAr = arRecords?.reduce((sum: number, ar: any) => sum + (ar.received_paid || 0), 0) || 0
 
-                    for (const ar of arRecords) {
-                        const reduction = ar.amount * reductionRatio
-                        const newAmount = ar.amount - reduction
+        // 如果有已收款金額，需要退款到帳戶
+        if (totalReceivedFromAr > 0) {
+            // 查詢與此銷售單相關的收款記錄，退還已收金額
+            const arIds = arRecords?.map((ar: any) => ar.id) || []
 
-                        if (newAmount <= 0) {
-                            await (supabaseServer
-                                .from('partner_accounts') as any)
-                                .delete()
-                                .eq('id', ar.id)
-                        } else {
-                            await (supabaseServer
-                                .from('partner_accounts') as any)
-                                .update({
-                                    amount: newAmount,
-                                    note: `銷貨轉購物金調整 - 減少 ${reduction}`,
-                                })
-                                .eq('id', ar.id)
+            if (arIds.length > 0) {
+                const { data: allocations } = await (supabaseServer
+                    .from('settlement_allocations') as any)
+                    .select('settlement_id, amount')
+                    .in('partner_account_id', arIds)
+
+                if (allocations && allocations.length > 0) {
+                    const settlementIds = [...new Set(allocations.map((a: any) => a.settlement_id))]
+
+                    for (const settlementId of settlementIds) {
+                        const { data: settlement } = await (supabaseServer
+                            .from('settlements') as any)
+                            .select('amount, account_id, method, partner_code')
+                            .eq('id', settlementId)
+                            .single()
+
+                        if (settlement) {
+                            if (settlement.method === 'store_credit' && settlement.partner_code) {
+                                // 購物金收款：回補購物金（這筆錢本來就是購物金，現在又轉購物金，需要加回來）
+                                const { data: cust } = await (supabaseServer
+                                    .from('customers') as any)
+                                    .select('store_credit')
+                                    .eq('customer_code', settlement.partner_code)
+                                    .single()
+
+                                if (cust) {
+                                    await (supabaseServer
+                                        .from('customers') as any)
+                                        .update({ store_credit: cust.store_credit + settlement.amount })
+                                        .eq('customer_code', settlement.partner_code)
+
+                                    // 記錄購物金回補日誌
+                                    await (supabaseServer
+                                        .from('customer_balance_logs') as any)
+                                        .insert({
+                                            customer_code: settlement.partner_code,
+                                            amount: settlement.amount,
+                                            balance_before: cust.store_credit,
+                                            balance_after: cust.store_credit + settlement.amount,
+                                            type: 'refund',
+                                            ref_type: 'sale_to_store_credit_refund',
+                                            ref_id: id,
+                                            ref_no: sale.sale_no,
+                                            note: `轉購物金時退還先前購物金收款`,
+                                            created_at: getTaiwanTime(),
+                                        })
+                                }
+
+                                // 刪除原扣除記錄
+                                await (supabaseServer
+                                    .from('customer_balance_logs') as any)
+                                    .delete()
+                                    .eq('ref_type', 'ar_receipt')
+                                    .eq('ref_id', settlementId)
+                            } else if (settlement.account_id) {
+                                // 現金/銀行收款：退款到帳戶
+                                const { data: account } = await (supabaseServer
+                                    .from('accounts') as any)
+                                    .select('balance')
+                                    .eq('id', settlement.account_id)
+                                    .single()
+
+                                if (account) {
+                                    const newBalance = account.balance - settlement.amount
+
+                                    await (supabaseServer
+                                        .from('accounts') as any)
+                                        .update({
+                                            balance: newBalance,
+                                            updated_at: getTaiwanTime(),
+                                        })
+                                        .eq('id', settlement.account_id)
+
+                                    // 記錄帳戶交易
+                                    await (supabaseServer
+                                        .from('account_transactions') as any)
+                                        .insert({
+                                            account_id: settlement.account_id,
+                                            transaction_type: 'sale_to_store_credit',
+                                            amount: -settlement.amount,
+                                            balance_before: account.balance,
+                                            balance_after: newBalance,
+                                            ref_type: 'sale_to_store_credit',
+                                            ref_id: id,
+                                            note: `轉購物金退還先前收款 - ${sale.sale_no}`,
+                                            created_at: getTaiwanTime(),
+                                        })
+                                }
+
+                                // 刪除原收款交易記錄
+                                await (supabaseServer
+                                    .from('account_transactions') as any)
+                                    .delete()
+                                    .eq('ref_type', 'settlement')
+                                    .eq('ref_id', settlementId)
+                            }
                         }
+
+                        // 刪除 settlement_allocations 和 settlement
+                        await (supabaseServer
+                            .from('settlement_allocations') as any)
+                            .delete()
+                            .eq('settlement_id', settlementId)
+
+                        await (supabaseServer
+                            .from('settlements') as any)
+                            .delete()
+                            .eq('id', settlementId)
                     }
+                }
+            }
+        }
+
+        // 刪除或調整 AR 記錄
+        if (isFullConversion) {
+            // 全額轉換：刪除所有 AR 記錄
+            await (supabaseServer
+                .from('partner_accounts') as any)
+                .delete()
+                .eq('ref_type', 'sale')
+                .eq('ref_id', id)
+        } else if (arRecords && arRecords.length > 0) {
+            // 部分轉換：按比例減少 AR（只處理未收款部分）
+            const totalArAmount = arRecords.reduce((sum: number, ar: any) => sum + ar.amount, 0)
+            const reductionRatio = conversionAmount / sale.total
+
+            for (const ar of arRecords) {
+                const reduction = ar.amount * reductionRatio
+                const newAmount = ar.amount - reduction
+
+                if (newAmount <= 0) {
+                    await (supabaseServer
+                        .from('partner_accounts') as any)
+                        .delete()
+                        .eq('id', ar.id)
+                } else {
+                    await (supabaseServer
+                        .from('partner_accounts') as any)
+                        .update({
+                            amount: newAmount,
+                            note: `銷貨轉購物金調整 - 減少 ${reduction}`,
+                        })
+                        .eq('id', ar.id)
                 }
             }
         }

@@ -8,7 +8,7 @@ type RouteContext = {
 
 // POST /api/sale-items/:id/to-store-credit - 將單一銷售品項轉為購物金
 // 條件：只有售價=0的品項才能轉購物金
-// 流程：輸入金額 -> 增加客戶購物金 -> 回補庫存（以輸入金額作為成本）
+// 流程：輸入數量 -> 輸入金額 -> 增加客戶購物金 -> 回補庫存（以輸入金額作為成本）
 export async function POST(
     request: NextRequest,
     context: RouteContext
@@ -16,7 +16,7 @@ export async function POST(
     try {
         const { id: saleItemId } = await context.params
         const body = await request.json()
-        const { amount, note } = body
+        const { amount, quantity: requestedQuantity, note } = body
 
         // 驗證金額
         if (!amount || amount <= 0) {
@@ -24,6 +24,16 @@ export async function POST(
                 { ok: false, error: '請輸入有效的金額' },
                 { status: 400 }
             )
+        }
+
+        // 驗證數量（如果有提供）
+        if (requestedQuantity !== undefined && requestedQuantity !== null) {
+            if (requestedQuantity <= 0 || !Number.isInteger(requestedQuantity)) {
+                return NextResponse.json(
+                    { ok: false, error: '請輸入有效的數量（正整數）' },
+                    { status: 400 }
+                )
+            }
         }
 
         // 1. 查詢銷售品項
@@ -62,6 +72,15 @@ export async function POST(
         if (saleItem.price !== 0) {
             return NextResponse.json(
                 { ok: false, error: '只有售價為 $0 的品項才能轉購物金' },
+                { status: 400 }
+            )
+        }
+
+        // 2.5 驗證並設定轉換數量
+        const convertQuantity = requestedQuantity ?? saleItem.quantity
+        if (convertQuantity > saleItem.quantity) {
+            return NextResponse.json(
+                { ok: false, error: `轉換數量不能超過品項數量（${saleItem.quantity}）` },
                 { status: 400 }
             )
         }
@@ -119,7 +138,7 @@ export async function POST(
                 ref_type: 'sale_item',
                 ref_id: saleItem.id,
                 ref_no: sale.sale_no,
-                note: note || `銷售品項 ${saleItem.products?.name} 轉購物金`,
+                note: note || `銷售品項 ${saleItem.products?.name} 轉購物金 (${convertQuantity}/${saleItem.quantity}件)`,
                 created_at: getTaiwanTime(),
             })
 
@@ -130,7 +149,7 @@ export async function POST(
             const product = saleItem.products
             const currentStock = product?.stock || 0
             const currentAvgCost = product?.avg_cost || 0
-            const restoreQty = saleItem.quantity
+            const restoreQty = convertQuantity // 使用指定的轉換數量
             const unitCost = conversionAmount / restoreQty // 用輸入金額當作成本
 
             // 計算新的平均成本
@@ -155,7 +174,7 @@ export async function POST(
                     ref_id: saleItem.id,
                     qty_change: restoreQty,
                     unit_cost: unitCost,
-                    memo: `轉購物金回補 - ${sale.sale_no} (成本: $${unitCost.toFixed(2)}/件)`,
+                    memo: `轉購物金回補 - ${sale.sale_no} (${restoreQty}/${saleItem.quantity}件, 成本: $${unitCost.toFixed(2)}/件)`,
                 })
 
             if (!invLogError) {
@@ -179,8 +198,8 @@ export async function POST(
                 corrected_total: 0,
                 adjustment_amount: 0,
                 store_credit_granted: conversionAmount,
-                items_adjusted: [{ sale_item_id: saleItem.id, quantity: saleItem.quantity, amount: conversionAmount }],
-                note: note || `單品轉購物金 - ${saleItem.products?.name}`,
+                items_adjusted: [{ sale_item_id: saleItem.id, quantity: convertQuantity, original_quantity: saleItem.quantity, amount: conversionAmount }],
+                note: note || `單品轉購物金 - ${saleItem.products?.name} (${convertQuantity}/${saleItem.quantity}件)`,
                 created_at: getTaiwanTime(),
             })
 
@@ -195,6 +214,8 @@ export async function POST(
                 product_name: saleItem.products?.name,
                 customer_name: customer.customer_name,
                 conversion_amount: conversionAmount,
+                converted_quantity: convertQuantity,
+                original_quantity: saleItem.quantity,
                 store_credit_before: storeCreditBefore,
                 store_credit_after: storeCreditAfter,
                 inventory_restored: inventoryRestored,
