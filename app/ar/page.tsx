@@ -58,6 +58,14 @@ type CustomerGroup = {
   unpaid_count: number
 }
 
+type PaymentAccount = {
+  id: string
+  account_name: string
+  payment_method_code: string
+  display_name: string | null
+  is_active: boolean
+}
+
 export default function ARPageV2() {
   const router = useRouter()
   const [accessDenied, setAccessDenied] = useState(false)
@@ -73,6 +81,7 @@ export default function ARPageV2() {
   const [keyword, setKeyword] = useState('')
   const [currentCustomer, setCurrentCustomer] = useState<string | null>(null)
   const [updatingPayment, setUpdatingPayment] = useState<string | null>(null)
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([])
 
   // 權限檢查
   useEffect(() => {
@@ -139,6 +148,23 @@ export default function ARPageV2() {
       return `還有 ${days} 天`
     }
     return formatDate(dueDate)
+  }
+
+  // 取得付款帳戶列表
+  const fetchPaymentAccounts = async () => {
+    try {
+      const res = await fetch('/api/accounts?active=true')
+      const data = await res.json()
+      if (data.ok) {
+        // 過濾掉 pending（待定不應該用於收款）
+        const accounts = (data.data || []).filter(
+          (acc: PaymentAccount) => acc.payment_method_code !== 'pending'
+        )
+        setPaymentAccounts(accounts)
+      }
+    } catch (err) {
+      console.error('Failed to fetch payment accounts:', err)
+    }
   }
 
   const fetchAccounts = async (page = currentPage) => {
@@ -298,6 +324,7 @@ export default function ARPageV2() {
 
   useEffect(() => {
     fetchAccounts()
+    fetchPaymentAccounts()
   }, [groupMode])
 
   const handleSearch = (e: React.FormEvent) => {
@@ -990,16 +1017,11 @@ export default function ARPageV2() {
                 onChange={(e) => setReceiptMethod(e.target.value)}
                 className="w-full rounded border border-gray-300 dark:border-gray-600 px-3 py-2 text-gray-900 dark:text-gray-100 dark:bg-gray-700"
               >
-                <option value="cash">現金</option>
-                <option value="card">刷卡</option>
-                <optgroup label="轉帳">
-                  <option value="transfer_cathay">轉帳 - 國泰</option>
-                  <option value="transfer_fubon">轉帳 - 富邦</option>
-                  <option value="transfer_esun">轉帳 - 玉山</option>
-                  <option value="transfer_union">轉帳 - 聯邦</option>
-                  <option value="transfer_linepay">轉帳 - LINE Pay</option>
-                </optgroup>
-                <option value="cod">貨到付款</option>
+                {paymentAccounts.map((account) => (
+                  <option key={account.id} value={account.payment_method_code}>
+                    {account.display_name || account.account_name}
+                  </option>
+                ))}
                 <option value="store_credit">購物金抵扣</option>
               </select>
               {receiptMethod === 'store_credit' && (

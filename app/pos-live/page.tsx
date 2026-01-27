@@ -75,7 +75,7 @@ export default function POSPage() {
   const [barcode, setBarcode] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pending')
-  const [isPaid, setIsPaid] = useState(true)
+  const [isPaid, setIsPaid] = useState(false) // 待定付款方式預設為未收款
   const [deliveryMethod, setDeliveryMethod] = useState('') // 新增：交貨方式
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('') // 新增：預計出貨日
   const [deliveryNote, setDeliveryNote] = useState('') // 新增：出貨備註
@@ -801,8 +801,8 @@ export default function POSPage() {
         setCart([])
         setSelectedCustomer(null)
         setCustomerSearchQuery('')
-        setPaymentMethod('cash')
-        setIsPaid(true)
+        setPaymentMethod('pending') // 直播模式預設待定
+        setIsPaid(false) // 待定付款方式預設為未收款
         setDeliveryMethod('') // 清空交貨方式
         setExpectedDeliveryDate('') // 清空預計出貨日
         setDeliveryNote('') // 清空出貨備註
@@ -862,8 +862,8 @@ export default function POSPage() {
         setCart([])
         setSelectedCustomer(null)
         setCustomerSearchQuery('')
-        setPaymentMethod('cash')
-        setIsPaid(true)
+        setPaymentMethod('pending') // 直播模式預設待定
+        setIsPaid(false) // 待定付款方式預設為未收款
         setNote('')
         setDiscountType('none')
         setDiscountValue(0)
@@ -1732,7 +1732,8 @@ export default function POSPage() {
                       key={account.id}
                       onClick={() => {
                         setPaymentMethod(account.payment_method_code as PaymentMethod)
-                        setIsPaid(account.auto_mark_paid)
+                        // 待定付款方式預設為未收款
+                        setIsPaid(account.payment_method_code === 'pending' ? false : account.auto_mark_paid)
                       }}
                       className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === account.payment_method_code
                         ? 'bg-indigo-600 text-white'
@@ -2161,6 +2162,31 @@ export default function POSPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* 假營業額（轉購物金前） */}
+                {closingStats.store_credit_converted > 0 && (
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border-2 border-purple-200 dark:border-purple-700">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="text-sm font-medium text-purple-800 dark:text-purple-400 mb-1">
+                          🎭 假營業額（轉購物金前）
+                        </div>
+                        <div className="text-xs text-purple-600 dark:text-purple-400">
+                          含 {closingStats.store_credit_count} 筆已轉購物金
+                        </div>
+                      </div>
+                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-300">
+                        {formatCurrency(closingStats.fake_total_sales)}
+                      </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-700 text-sm text-purple-700 dark:text-purple-300">
+                      <div className="flex justify-between">
+                        <span>轉購物金金額：</span>
+                        <span className="font-semibold">-{formatCurrency(closingStats.store_credit_converted)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* 已收款 vs 未收款 */}
                 <div className="grid grid-cols-2 gap-4">

@@ -83,6 +83,31 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // 2.5 查詢轉購物金的銷售（用於計算假營業額）
+    // 這些銷售的 total 已經變成 0，但我們需要知道原本的金額
+    const { data: storeCreditSales } = await (supabaseServer
+      .from('sales') as any)
+      .select('id, total, sale_no, created_at')
+      .gt('created_at', lastClosingTime)
+      .eq('source', source)
+      .eq('status', 'store_credit')
+
+    // 查詢這些銷售的更正記錄，獲取原始金額
+    let storeCreditOriginalTotal = 0
+    if (storeCreditSales && storeCreditSales.length > 0) {
+      const saleIds = storeCreditSales.map((s: any) => s.id)
+      const { data: corrections } = await (supabaseServer
+        .from('sale_corrections') as any)
+        .select('sale_id, original_total, store_credit_granted')
+        .in('sale_id', saleIds)
+        .eq('correction_type', 'to_store_credit')
+
+      if (corrections) {
+        // 累加原始金額（轉購物金前的金額）
+        storeCreditOriginalTotal = corrections.reduce((sum: number, c: any) => sum + (c.original_total || 0), 0)
+      }
+    }
+
     // 3. 統計各種付款方式（區分已收款和未收款）
     const stats = {
       sales_count: sales?.length || 0,
@@ -93,6 +118,11 @@ export async function GET(request: NextRequest) {
       total_card: 0,
       total_transfer: 0,
       total_cod: 0,
+
+      // 假營業額（包含轉購物金的原始金額）
+      fake_total_sales: 0,
+      store_credit_converted: storeCreditOriginalTotal, // 轉購物金的金額
+      store_credit_count: storeCreditSales?.length || 0, // 轉購物金的筆數
 
       // 已收款統計
       paid_count: 0,
@@ -163,6 +193,9 @@ export async function GET(request: NextRequest) {
         }
       }
     })
+
+    // 計算假營業額 = 真實營業額 + 轉購物金的原始金額
+    stats.fake_total_sales = stats.total_sales + storeCreditOriginalTotal
 
     return NextResponse.json({
       ok: true,
