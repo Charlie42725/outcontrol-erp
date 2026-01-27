@@ -26,6 +26,12 @@ type Transaction = {
     ref_id: string
     ref_no: string | null
     note: string | null
+    // Enriched fields
+    customer_name?: string | null
+    customer_code?: string | null
+    vendor_name?: string | null
+    vendor_code?: string | null
+    original_payment_method?: string | null
 }
 
 const TRANSACTION_TYPE_LABELS: Record<string, string> = {
@@ -197,7 +203,9 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
                                 <tr>
                                     <th className="px-6 py-3">時間</th>
                                     <th className="px-6 py-3">類型</th>
-                                    <th className="px-6 py-3">單號 / 備註</th>
+                                    <th className="px-6 py-3">單號</th>
+                                    <th className="px-6 py-3">客戶 / 廠商</th>
+                                    <th className="px-6 py-3">備註</th>
                                     <th className="px-6 py-3 text-right">金額</th>
                                     <th className="px-6 py-3 text-right">變動後餘額</th>
                                 </tr>
@@ -205,13 +213,13 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                 {loading && transactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                                             載入中...
                                         </td>
                                     </tr>
                                 ) : transactions.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                                             尚無符合條件的交易記錄
                                         </td>
                                     </tr>
@@ -222,6 +230,10 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
                                         // Fallback logic if balance_before is missing: assume sale/customer_payment is +
                                         const isPositive = ['sale', 'customer_payment', 'adjustment_increase', 'transfer_in'].includes(tx.transaction_type) || change >= 0;
 
+                                        // Determine customer or vendor display
+                                        const partyName = tx.customer_name || tx.vendor_name || null
+                                        const partyCode = tx.customer_code || tx.vendor_code || null
+
                                         return (
                                             <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -229,22 +241,47 @@ export default function AccountDetailPage({ params }: { params: Promise<{ id: st
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${['sale', 'customer_payment', 'transfer_in'].includes(tx.transaction_type)
-                                                        ? 'bg-green-100 text-green-800'
+                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                                                         : ['expense', 'purchase_payment', 'transfer_out'].includes(tx.transaction_type)
-                                                            ? 'bg-red-100 text-red-800'
-                                                            : 'bg-gray-100 text-gray-800'
+                                                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                                         }`}>
                                                         {TRANSACTION_TYPE_LABELS[tx.transaction_type] || tx.transaction_type}
                                                     </span>
+                                                    {tx.original_payment_method && tx.original_payment_method !== 'cash' && (
+                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                                                            {tx.original_payment_method === 'pending' ? '待確定' : tx.original_payment_method}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="text-sm text-gray-900 dark:text-gray-100">
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                                         {tx.ref_no || '-'}
                                                     </div>
-                                                    {tx.note && (
-                                                        <div className="text-xs text-gray-500">
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {partyName || partyCode ? (
+                                                        <div>
+                                                            <div className="text-sm text-gray-900 dark:text-gray-100">
+                                                                {partyName || partyCode}
+                                                            </div>
+                                                            {partyName && partyCode && partyName !== partyCode && (
+                                                                <div className="text-xs text-gray-500">
+                                                                    {partyCode}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-400">-</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {tx.note ? (
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400 max-w-[200px] truncate" title={tx.note}>
                                                             {tx.note}
                                                         </div>
+                                                    ) : (
+                                                        <span className="text-gray-400">-</span>
                                                     )}
                                                 </td>
                                                 <td className={`px-6 py-4 text-right font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
