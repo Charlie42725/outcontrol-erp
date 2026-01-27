@@ -81,8 +81,13 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
         }
     }
 
+    // Types for enrichment data
+    type SaleRecord = { id: string; sale_no: string; customer_code: string | null; payment_method: string; customers: { customer_name: string } | null }
+    type PurchaseRecord = { id: string; purchase_no: string; vendor_code: string; vendors: { vendor_name: string } | null }
+    type SettlementRecord = { id: string; settlement_no: string; vendor_code: string; vendors: { vendor_name: string } | null }
+
     // Fetch sales with customer info
-    const salesMap: Record<string, { id: string; sale_no: string; customer_code: string | null; payment_method: string; customers: { customer_name: string } | null }> = {}
+    const salesMap: Record<string, SaleRecord> = {}
     if (saleRefIds.length > 0) {
         const { data: sales } = await supabaseServer
             .from('sales')
@@ -98,7 +103,7 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
             .in('id', saleRefIds)
 
         if (sales) {
-            for (const sale of sales) {
+            for (const sale of sales as unknown as SaleRecord[]) {
                 salesMap[sale.id] = sale
             }
         }
@@ -121,10 +126,10 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
                     customer_name
                 )
             `)
-            .in('sale_no', saleNos)
+            .in('sale_no', saleNos as string[])
 
         if (salesByNo) {
-            for (const sale of salesByNo) {
+            for (const sale of salesByNo as unknown as SaleRecord[]) {
                 if (!salesMap[sale.id]) {
                     salesMap[sale.id] = sale
                 }
@@ -135,7 +140,7 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
     }
 
     // Fetch purchases with vendor info
-    const purchasesMap: Record<string, { id: string; purchase_no: string; vendor_code: string; vendors: { vendor_name: string } | null }> = {}
+    const purchasesMap: Record<string, PurchaseRecord> = {}
     const purchaseNos = transactions
         .filter(tx => tx.ref_no && tx.ref_no.startsWith('P'))
         .map(tx => tx.ref_no)
@@ -151,10 +156,10 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
                     vendor_name
                 )
             `)
-            .in('purchase_no', purchaseNos)
+            .in('purchase_no', purchaseNos as string[])
 
         if (purchases) {
-            for (const purchase of purchases) {
+            for (const purchase of purchases as unknown as PurchaseRecord[]) {
                 purchasesMap[purchase.id] = purchase
                 purchasesMap[purchase.purchase_no] = purchase
             }
@@ -162,7 +167,7 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
     }
 
     // Fetch settlements if any
-    const settlementsMap: Record<string, { id: string; settlement_no: string; vendor_code: string; vendors: { vendor_name: string } | null }> = {}
+    const settlementsMap: Record<string, SettlementRecord> = {}
     if (settlementRefIds.length > 0) {
         const { data: settlements } = await supabaseServer
             .from('settlements')
@@ -177,7 +182,7 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
             .in('id', settlementRefIds)
 
         if (settlements) {
-            for (const settlement of settlements) {
+            for (const settlement of settlements as unknown as SettlementRecord[]) {
                 settlementsMap[settlement.id] = settlement
             }
         }
@@ -185,10 +190,10 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
 
     // Enrich each transaction
     return transactions.map(tx => {
-        const enriched = { ...tx }
+        const enriched: EnrichedTransaction = { ...tx }
 
         // Try to match sale
-        const sale = salesMap[tx.ref_id] || salesMap[tx.ref_no]
+        const sale = salesMap[tx.ref_id] || (tx.ref_no ? salesMap[tx.ref_no] : undefined)
         if (sale) {
             enriched.customer_name = sale.customers?.customer_name || sale.customer_code || null
             enriched.customer_code = sale.customer_code
@@ -196,7 +201,7 @@ async function enrichTransactions(transactions: TransactionRecord[]): Promise<En
         }
 
         // Try to match purchase
-        const purchase = purchasesMap[tx.ref_id] || purchasesMap[tx.ref_no]
+        const purchase = purchasesMap[tx.ref_id] || (tx.ref_no ? purchasesMap[tx.ref_no] : undefined)
         if (purchase) {
             enriched.vendor_name = purchase.vendors?.vendor_name || purchase.vendor_code || null
             enriched.vendor_code = purchase.vendor_code
