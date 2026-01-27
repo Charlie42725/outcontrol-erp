@@ -1732,8 +1732,8 @@ export default function POSPage() {
                       key={account.id}
                       onClick={() => {
                         setPaymentMethod(account.payment_method_code as PaymentMethod)
-                        // 待定付款方式預設為未收款
-                        setIsPaid(account.payment_method_code === 'pending' ? false : account.auto_mark_paid)
+                        // 只有待定是未收款，其他都是已收款
+                        setIsPaid(account.payment_method_code !== 'pending')
                       }}
                       className={`py-2.5 px-3 rounded-lg text-sm transition-all ${paymentMethod === account.payment_method_code
                         ? 'bg-indigo-600 text-white'
