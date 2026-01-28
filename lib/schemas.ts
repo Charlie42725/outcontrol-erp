@@ -127,17 +127,7 @@ export const settlementSchema = z.object({
   partner_type: z.enum(['customer', 'vendor']),
   partner_code: z.string().min(1, 'Partner code is required'),
   direction: z.enum(['receipt', 'payment']),
-  method: z.enum([
-    'cash',
-    'card',
-    'transfer_cathay',
-    'transfer_fubon',
-    'transfer_esun',
-    'transfer_union',
-    'transfer_linepay',
-    'cod',
-    'store_credit'
-  ]).optional(),
+  method: z.string().optional(),  // 動態付款方式，對應帳戶的 payment_method_code
   amount: z.number().positive('Amount must be positive'),
   note: z.string().optional(),
   account_id: z.string().uuid().optional(),  // 新增：關聯的帳戶 ID（選用，可從 method 自動解析）
