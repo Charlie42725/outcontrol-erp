@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
@@ -30,6 +30,12 @@ export default function NewPurchasePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // 掃描槍防抖處理
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const allProductsRef = useRef<Product[]>([])
+  const [allProductsLoaded, setAllProductsLoaded] = useState(false)
+
   // 快速新增商品 Modal
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [quickAddName, setQuickAddName] = useState('')
@@ -39,6 +45,7 @@ export default function NewPurchasePage() {
 
   useEffect(() => {
     fetchVendors()
+    fetchAllProducts()
   }, [])
 
   const fetchVendors = async () => {
@@ -53,6 +60,20 @@ export default function NewPurchasePage() {
     }
   }
 
+  // 預載所有商品用於快速條碼比對
+  const fetchAllProducts = async () => {
+    try {
+      const res = await fetch('/api/products?limit=10000')
+      const data = await res.json()
+      if (data.ok) {
+        allProductsRef.current = data.data || []
+        setAllProductsLoaded(true)
+      }
+    } catch (err) {
+      console.error('Failed to fetch products:', err)
+    }
+  }
+
   const searchProducts = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([])
@@ -64,12 +85,9 @@ export default function NewPurchasePage() {
     try {
       const res = await fetch(`/api/products/search?keyword=${encodeURIComponent(query)}&active_only=false`)
       const data = await res.json()
-      console.log('Search API response:', data) // Debug log
       if (data.ok) {
         setSearchResults(data.data || [])
-        console.log('Search results:', data.data) // Debug log
       } else {
-        console.error('Search API error:', data.error)
         setSearchResults([])
       }
     } catch (err) {
@@ -78,6 +96,38 @@ export default function NewPurchasePage() {
     } finally {
       setSearching(false)
     }
+  }
+
+  // 處理搜尋輸入（支援掃描槍快速輸入）
+  const handleSearchInput = (value: string) => {
+    setSearchKeyword(value)
+
+    // 清除之前的計時器
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current)
+    }
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // 掃描槍偵測：100ms 內完成輸入且內容較長視為條碼掃描
+    scanTimeoutRef.current = setTimeout(() => {
+      if (value.trim() && allProductsLoaded) {
+        // 嘗試精確比對條碼
+        const matchedProduct = allProductsRef.current.find(
+          p => p.barcode && p.barcode.toLowerCase() === value.trim().toLowerCase()
+        )
+        if (matchedProduct) {
+          addItem(matchedProduct)
+          return
+        }
+      }
+
+      // 如果不是條碼，延遲搜尋
+      searchTimeoutRef.current = setTimeout(() => {
+        searchProducts(value)
+      }, 200)
+    }, 100)
   }
 
   const addItem = (product: Product) => {
@@ -285,15 +335,12 @@ export default function NewPurchasePage() {
 
           {/* Product search */}
           <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 md:p-6">
-            <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">搜尋商品</label>
+            <label className="mb-2 block text-sm font-medium text-gray-900 dark:text-gray-100">搜尋商品（支援條碼掃描）</label>
             <input
               type="text"
               value={searchKeyword}
-              onChange={(e) => {
-                setSearchKeyword(e.target.value)
-                searchProducts(e.target.value)
-              }}
-              placeholder="輸入商品名稱或品號"
+              onChange={(e) => handleSearchInput(e.target.value)}
+              placeholder="輸入商品名稱、品號或掃描條碼"
               className="w-full rounded border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-500"
             />
 
