@@ -340,6 +340,12 @@ export default function NewPurchasePage() {
               type="text"
               value={searchKeyword}
               onChange={(e) => handleSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                // 阻止 Enter 鍵觸發表單提交（掃描槍通常會在條碼後發送 Enter）
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                }
+              }}
               placeholder="輸入商品名稱、品號或掃描條碼"
               className="w-full rounded border border-gray-300 bg-white px-4 py-2 text-gray-900 placeholder:text-gray-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder:text-gray-500"
             />
